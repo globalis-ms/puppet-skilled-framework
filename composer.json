@@ -1,0 +1,24 @@
+{
+    "description": "Puppet Skilled framework",
+    "name": "globalis/puppet-skilled-framework",
+    "type": "project",
+    "homepage": "https://globalis-ms.com",
+    "require": {
+        "php": ">=5.6",
+        "pimple/pimple": "^3.0",
+        "league/commonmark": "^0.15.3",
+        "nesbot/carbon": "^1.21"
+    },
+    "require-dev": {
+        "mockery/mockery": "^0.9.7",
+        "phpunit/phpunit": "^5.7"
+    },
+    "autoload": {
+        "files": [
+            "src/Core/helpers.php"
+        ],
+       "psr-4": {
+           "Globalis\\PuppetSkilled\\": "src"
+       }
+    }
+}
