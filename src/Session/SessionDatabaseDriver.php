@@ -6,6 +6,11 @@ use Globalis\PuppetSkilled\Core\Application;
 class SessionDatabaseDriver extends \CI_Session_driver
 {
     /**
+     * Is session regenerate id
+     */
+    protected $sessionRegenerateId = false;
+
+    /**
      * DB object
      *
      * @var    object
@@ -67,10 +72,11 @@ class SessionDatabaseDriver extends \CI_Session_driver
     {
         if ($this->get_lock($sessionId) !== false) {
             // Needed by write() to detect session_regenerate_id() calls
-            $this->_session_id = $sessionId;
-
+            if (!$this->_session_id) {
+                $this->_session_id = $sessionId;
+            }
             $query = $this->newQuery()
-                ->select('data')
+                ->select('timestamp', 'data')
                 ->where('id', $sessionId);
 
             if ($this->_config['match_ip']) {
@@ -81,13 +87,21 @@ class SessionDatabaseDriver extends \CI_Session_driver
                 // PHP7 will reuse the same SessionHandler object after
                 // ID regeneration, so we need to explicitly set this to
                 // false instead of relying on the default ...
-                $this->_row_exists = false;
+                if ($this->_session_id === $sessionId) {
+                    $this->row_exists = false;
+                }
+                $this->_fingerprint = md5('');
+                return '';
+            }
+
+            $this->row_exists = true;
+
+            if ($result->timestamp < (time() - $this->_config['expiration'])) {
                 $this->_fingerprint = md5('');
                 return '';
             }
             $result = $result->data;
             $this->_fingerprint = md5($result);
-            $this->_row_exists = true;
             return $result;
         }
         $this->_fingerprint = md5('');
@@ -107,49 +121,30 @@ class SessionDatabaseDriver extends \CI_Session_driver
     {
         if ($this->_lock === false) {
             return $this->_fail();
-        } elseif ($sessionId !== $this->_session_id) {
-            // Was the ID regenerated?
-            if (!$this->_release_lock() || !$this->get_lock($sessionId)) {
-                return $this->_fail();
-            }
-
-            $this->_row_exists = false;
-            $this->_session_id = $sessionId;
         }
 
-        if ($this->_row_exists === false) {
-            $insertData = array(
-                'id' => $sessionId,
-                'ip_address' => $_SERVER['REMOTE_ADDR'],
-                'timestamp' => time(),
-                'data' => $sessionData
-            );
+        $insertData = array(
+            'id' => $sessionId,
+            'ip_address' => $_SERVER['REMOTE_ADDR'],
+            'timestamp' => time(),
+            'data' => $sessionData
+        );
 
+        if (!$this->row_exists) {
             if ($this->newQuery()->insert($insertData)) {
+                $this->_session_id = $sessionId;
+                $this->row_exists = true;
                 $this->_fingerprint = md5($sessionData);
-                $this->_row_exists = true;
                 return $this->_success;
             }
-
-            return $this->_fail();
+        } else {
+            if ($this->newQuery()->where('id', $this->_session_id)->update($insertData)) {
+                $this->_session_id = $sessionId;
+                $this->row_exists = true;
+                $this->_fingerprint = md5($sessionData);
+                return $this->_success;
+            }
         }
-
-        $query = $this->newQuery()
-            ->where('id', $sessionId);
-        if ($this->_config['match_ip']) {
-            $query->where('ip_address', $_SERVER['REMOTE_ADDR']);
-        }
-
-        $update_data = array('timestamp' => time());
-        if ($this->_fingerprint !== md5($sessionData)) {
-            $update_data['data'] = $sessionData;
-        }
-
-        if ($query->update($update_data)) {
-            $this->_fingerprint = md5($sessionData);
-            return $this->_success;
-        }
-
         return $this->_fail();
     }
 
@@ -180,15 +175,10 @@ class SessionDatabaseDriver extends \CI_Session_driver
         if ($this->_lock) {
             $query = $this->newQuery()
                 ->where('id', $sessionId);
-            if ($this->_config['match_ip']) {
-                $query->where('ip_address', $_SERVER['REMOTE_ADDR']);
-            }
-
             if (!$query->delete()) {
                 return $this->_fail();
             }
         }
-
         if ($this->close() === $this->_success) {
             $this->_cookie_destroy();
             return $this->_success;
