@@ -32,6 +32,7 @@ class QueryPager
         'limit' => 10,
         'limit_choices' => null,//possible limit leave empty for all
         'save' => false,//save entry in session ? false = no save else contexte name
+        'unique_order_key' => 'id', // Unique order key
     ];
 
     /**
@@ -153,6 +154,16 @@ class QueryPager
                     }
                 }
             }
+        }
+        // Add order by unique key
+        if ($query instanceof \Globalis\PuppetSkilled\Database\Magic\Builder) {
+            $isOrdering = !empty($query->getQuery()->orders);
+        } else {
+            $isOrdering = !empty($query->orders);
+        }
+
+        if ($isOrdering) {
+            $query->orderBy($options['unique_order_key']);
         }
 
         if (!empty($options['limit_choices']) && !in_array($options['limit'], $options['limit_choices'])) {
