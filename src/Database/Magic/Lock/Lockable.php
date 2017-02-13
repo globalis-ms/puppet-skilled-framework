@@ -6,11 +6,16 @@ use \Exception;
 
 trait Lockable
 {
+    protected function getLockClassModel()
+    {
+        return (isset($this->lockClassModel))? $this->lockClassModel : '\Globalis\PuppetSkilled\Database\Magic\Lock\Lock';
+    }
+
     public function lock()
     {
         // Lock GC
-        Lock::gc();
-        return $this->morphOne(Lock::class, 'lockable', 'lockable_type', 'row_id');
+        $this->getLockClassModel()::gc();
+        return $this->morphOne($this->getLockClassModel(), 'lockable', 'lockable_type', 'row_id');
     }
 
     public function isLocked()

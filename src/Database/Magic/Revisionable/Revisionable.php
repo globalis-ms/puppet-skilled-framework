@@ -13,6 +13,11 @@ trait Revisionable
         static::observe(Listener::class);
     }
 
+    protected function getRevisionableClassModel()
+    {
+        return (isset($this->revisionClassModel))? $this->revisionClassModel : '\Globalis\PuppetSkilled\Database\Magic\Revisionable\Revision';
+    }
+
     /**
      * Determine if model has history at given timestamp if provided or any at all.
      *
@@ -124,7 +129,7 @@ trait Revisionable
      */
     public function revisions()
     {
-        return $this->morphMany(Revision::class, 'revisionable', 'revisionable_type', 'row_id')
+        return $this->morphMany($this->getRevisionableClassModel(), 'revisionable', 'revisionable_type', 'row_id')
                     ->ordered();
     }
 
@@ -135,7 +140,7 @@ trait Revisionable
      */
     public function latestRevision()
     {
-        return $this->morphOne(Revision::class, 'revisionable', 'revisionable_type', 'row_id')
+        return $this->morphOne($this->getRevisionableClassModel(), 'revisionable', 'revisionable_type', 'row_id')
                     ->ordered();
     }
 }
