@@ -81,7 +81,7 @@ class Authentification extends \Globalis\PuppetSkilled\Service\Base
             // prepare resources
             $resources = [];
             if ($role->resources_support) {
-                $resources_support = unserialize($role->resources_support);
+                $resources_support = $role->resources_support;
                 foreach ($resources_support as $resource) {
                     $resource = new $resource();
                     $resource->buildFromUserHasRoleid($role->pivot->getKey());
