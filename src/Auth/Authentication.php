@@ -4,11 +4,11 @@ namespace Globalis\PuppetSkilled\Auth;
 use \Globalis\PuppetSkilled\Core\Application;
 use \Globalis\PuppetSkilled\Library\FormValidation;
 
-class Authentification extends \Globalis\PuppetSkilled\Service\Base
+class Authentication extends \Globalis\PuppetSkilled\Service\Base
 {
-    protected $userSessionKey = 'authentifcation.user';
+    protected $userSessionKey = 'authentication.user';
 
-    protected $permissionsSessionKey = 'authentification.capabilities';
+    protected $permissionsSessionKey = 'authentication.capabilities';
 
     protected $resources = [];
 
@@ -34,11 +34,11 @@ class Authentification extends \Globalis\PuppetSkilled\Service\Base
         $validator = new FormValidation();
         $validator->set_rules(
             'username',
-            'lang:authentitifcation_label_username',
+            'lang:authentication_label_username',
             [
                 'trim',
                 [
-                    'authentification_error_invalid_account',
+                    'authentication_error_invalid_account',
                     function ($value) use ($validator) {
                         $password = $validator->set_value('password');
                         if (empty($value)) {
@@ -58,7 +58,7 @@ class Authentification extends \Globalis\PuppetSkilled\Service\Base
         );
         $validator->set_rules(
             'password',
-            'lang:authentitifcation_label_password',
+            'lang:authentication_label_password',
             [
                 'trim',
                 'required'
@@ -67,7 +67,7 @@ class Authentification extends \Globalis\PuppetSkilled\Service\Base
         if ($validator->run($data)) {
             $this->loadProfil($validator->validation_data['userEntity']);
         } else {
-            if ($validator->ran() && $delay = $this->settings->get('authentification.delay_after_login_failed')) {
+            if ($validator->ran() && $delay = $this->settings->get('authentication.delay_after_login_failed')) {
                 sleep($delay);
             }
         }

@@ -20,14 +20,14 @@ trait Lockable
 
     public function isLocked()
     {
-        $user = app()->authentificationService->user();
+        $user = app()->authenticationService->user();
         return ($this->lock && $this->lock->expired_at->gt(Carbon::now()) && $this->lock->user_id !== $user->getKey());
     }
 
     public function acquireLock(Carbone $expired_at = null)
     {
         if (!$this->isLocked()) {
-            $user = app()->authentificationService->user();
+            $user = app()->authenticationService->user();
             if ($this->lock) {
                 $this->lock->update([
                     'user_id' => $user->id,

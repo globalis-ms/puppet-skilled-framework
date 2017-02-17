@@ -70,7 +70,7 @@ class Listener
                 $new = $revisioned->getNewAttributes();
                 break;
         }
-        $user = app()->authentificationService->user();
+        $user = app()->authenticationService->user();
         $revisioned->revisions()->create([
             'table_name' => $revisioned->getTable(),
             'action' => $action,
