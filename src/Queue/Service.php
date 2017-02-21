@@ -61,6 +61,7 @@ class Service
                     $options
                 );
             }
+            return false;
         } catch (Exception $e) {
             $this->reportExceptions($e);
         }

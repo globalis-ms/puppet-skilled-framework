@@ -100,6 +100,16 @@ class QueryPager
     }
 
     /**
+     * Get sortable fields
+     *
+     * @return array
+     */
+    public function getSortable()
+    {
+        return $this->options['sort'];
+    }
+
+    /**
      * Get pager result
      *
      * @return array
