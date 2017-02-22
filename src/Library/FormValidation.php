@@ -107,6 +107,23 @@ class FormValidation extends \CI_Form_validation
     }
 
     /**
+     * Add error message
+     *
+     * @param   string  $message
+     * @param   string  $field
+     * @return  \Globalis\PuppetSkilled\Library\FormValidation
+     */
+    public function add_error($message, $field = null)
+    {
+        // Save the error message
+        if (isset($field)) {
+            $this->_field_data[$field]['error'] = $message;
+        }
+        $this->_error_array[] = $message;
+        return $this;
+    }
+
+    /**
      * Set Select
      *
      * Enables pull-down lists to be set to the value the user
@@ -222,5 +239,20 @@ class FormValidation extends \CI_Form_validation
             return parent::run($group);
         }
         return false;
+    }
+
+    /**
+     * Exist
+     *
+     * Check if the input value exist
+     * in the specified database field.
+     *
+     * @param	string	$str
+     * @param	string	$field
+     * @return	bool
+     */
+    public function exist($str, $field)
+    {
+        return !$this->is_unique($str, $field);
     }
 }
