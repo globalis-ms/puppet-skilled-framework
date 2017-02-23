@@ -19,7 +19,7 @@ class Asset
      *
      * @var string
      */
-    protected $htmlStylePpath;
+    protected $htmlStylePath;
 
     /**
      * Base path to javascript
@@ -79,7 +79,7 @@ class Asset
      */
     public function __construct($config = [])
     {
-        $this->htmlStylePpath = isset($config['html_style_path']) ? trim($config['html_style_path'], '/') . '/' : 'public/css/';
+        $this->htmlStylePath = isset($config['html_style_path']) ? trim($config['html_style_path'], '/') . '/' : 'public/css/';
         $this->htmlScriptPath = isset($config['html_script_path']) ? trim($config['html_script_path'], '/') . '/' : 'public/js/';
         $this->htmlImagePath = isset($config['html_image_path']) ? trim($config['html_image_path'], '/') . '/' : 'public/images/';
 
@@ -223,7 +223,7 @@ class Asset
      */
     public function getStyleLink($filename)
     {
-        return base_url() . $this->htmlStylePpath . preg_replace('/(.*)\.css$/', '$1', $filename) . '.css';
+        return base_url() . $this->htmlStylePath . preg_replace('/(.*)\.css$/', '$1', $filename) . '.css';
     }
 
     /**

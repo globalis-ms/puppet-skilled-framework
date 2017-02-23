@@ -140,11 +140,11 @@ class FormValidation extends \CI_Form_validation
             return ($default === true) ? ' selected="selected"' : '';
         }
 
-        $field = (isset($this->_field_data[$field]['postdata']) ?: '');
+        $field = (isset($this->_field_data[$field]['postdata']) ? $this->_field_data[$field]['postdata']: '');
         $value = (string) $value;
         if (is_array($field)) {
         // Note: in_array('', array(0)) returns true, do not use it
-            foreach ($field as &$v) {
+            foreach ($field as $v) {
                 if ($value === $v) {
                     return ' selected="selected"';
                 }
