@@ -12,6 +12,7 @@ class Authentication extends \Globalis\PuppetSkilled\Service\Base
 
     protected $resources = [];
 
+    protected $user;
 
     public function newUserTable()
     {
@@ -99,7 +100,7 @@ class Authentication extends \Globalis\PuppetSkilled\Service\Base
                 $acl->allow($permission->permission_name, $resources);
             }
         }
-        $_SESSION[$this->userSessionKey] = $user;
+        $_SESSION[$this->userSessionKey] = $user->getKey();
         $_SESSION[$this->permissionsSessionKey] = $acl;
     }
 
@@ -125,7 +126,16 @@ class Authentication extends \Globalis\PuppetSkilled\Service\Base
 
     public function user()
     {
-        return $this->session->{$this->userSessionKey};
+        if ($this->user) {
+            return $this->user;
+        }
+
+        if ($this->session->{$this->userSessionKey}) {
+            // Build user
+            $this->user = $this->newUserTable()->find($this->session->{$this->userSessionKey});
+            return $this->user;
+        }
+        return false;
     }
 
     public function isLoggedIn()
