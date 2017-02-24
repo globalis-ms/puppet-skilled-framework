@@ -29,7 +29,7 @@ trait Lockable
         if (!$this->isLocked()) {
             $user = app()->authenticationService->user();
             if ($this->lock) {
-                $this->lock->update([
+                $this->lock()->update([
                     'user_id' => $user->id,
                     'expired_at' => ($expired_at?: $this->getDefaultLockTime()),
                     'created_at' => Carbon::now(),
