@@ -115,11 +115,13 @@ class FormValidation extends \CI_Form_validation
      */
     public function add_error($message, $field = null)
     {
+        $message = array_values((array)$message);
+
         // Save the error message
         if (isset($field)) {
-            $this->_field_data[$field]['error'] = $message;
+            $this->_field_data[$field]['error'] = $message[0];
         }
-        $this->_error_array[] = $message;
+        $this->_error_array = array_merge($this->_error_array, $message);
         return $this;
     }
 
@@ -247,9 +249,9 @@ class FormValidation extends \CI_Form_validation
      * Check if the input value exist
      * in the specified database field.
      *
-     * @param	string	$str
-     * @param	string	$field
-     * @return	bool
+     * @param   string  $str
+     * @param   string  $field
+     * @return  bool
      */
     public function exist($str, $field)
     {
