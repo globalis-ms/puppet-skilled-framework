@@ -72,6 +72,7 @@ class Node
 
             if ($rightKey == '*') {
                 foreach ($this->children as $child) {
+                    $acl->enqueue($rightKey);
                     if ($child->isAllowed(clone $acl, $resourceType, $resourceId)) {
                         return true;
                     }
