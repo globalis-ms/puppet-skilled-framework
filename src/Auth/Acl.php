@@ -12,10 +12,10 @@ class Acl
         $this->root = new Node('root', false);
     }
 
-    public function isAllowed($acl, Resource $resource = null)
+    public function isAllowed($acl, $resourceType = null, $resourceValue = null)
     {
         $queue = $this->stringToQueue($acl);
-        return $this->root->isAllowed($queue, $resource);
+        return $this->root->isAllowed($queue, $resourceType, $resourceValue);
     }
 
     public function allow($capability, array $resources)

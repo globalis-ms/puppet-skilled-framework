@@ -111,10 +111,10 @@ class Authentication extends \Globalis\PuppetSkilled\Service\Base
         return true;
     }
 
-    public function userCan($permission)
+    public function userCan($permission, $resourceType = null, $resourceValue = null)
     {
         if ($currentPermissions = $this->permissions()) {
-            return $currentPermissions->isAllowed($permission);
+            return $currentPermissions->isAllowed($permission, $resourceType, $resourceValue);
         }
         return false;
     }
