@@ -3,6 +3,7 @@ namespace Globalis\PuppetSkilled\Auth;
 
 use \Globalis\PuppetSkilled\Core\Application;
 use \Globalis\PuppetSkilled\Library\FormValidation;
+use Carbon\Carbon;
 
 class Authentication extends \Globalis\PuppetSkilled\Service\Base
 {
@@ -13,6 +14,18 @@ class Authentication extends \Globalis\PuppetSkilled\Service\Base
     protected $resources = [];
 
     protected $user;
+
+    protected $tokenTable = 'reset_tokens';
+
+    public function setTokenTable(string $table)
+    {
+        $this->tokenTable = $table;
+    }
+
+    public function getTokenTable()
+    {
+        return $this->tokenTable;
+    }
 
     public function newUserTable()
     {
@@ -138,6 +151,52 @@ class Authentication extends \Globalis\PuppetSkilled\Service\Base
         return false;
     }
 
+    /***************************************************************************
+     * RESET TOKEN
+     **************************************************************************/
+
+    /**
+     * Retrieve a reset token
+     *
+     * @param string $token
+     * @return null|stdClass Token
+     */
+    public function retrieveResetToken($token)
+    {
+        return $this->queryBuilder->from($this->getTokenTable())
+            ->where('token', $token)
+            ->first();
+    }
+
+    /**
+     * Delete a reset token
+     *
+     * @param string $token
+     * @return boolean
+     */
+    public function deleteToken($token)
+    {
+        return $this->queryBuilder->from($this->getTokenTable())
+            ->where('token', $token)
+            ->delete();
+    }
+    /**
+     * Create a reset token
+     *
+     * @param  \App\Model\User $user
+     * @return string
+     */
+    public function registerToken(\Globalis\PuppetSkilled\Database\Magic\Model $user)
+    {
+        $this->queryBuilder->from($this->getTokenTable())
+            ->insert([
+                'user_id' => $user->getKey(),
+                'token' => ($token = $this->generateResetToken()),
+                'created_at' => new Carbon(),
+            ]);
+        return $token;
+    }
+
     public function isLoggedIn()
     {
         return ($this->user() ?  true : false);
@@ -146,5 +205,16 @@ class Authentication extends \Globalis\PuppetSkilled\Service\Base
     public function getResources()
     {
         return $this->resources;
+    }
+
+    protected function generateResetToken()
+    {
+        $string = '';
+        while (($len = strlen($string)) < 40) {
+            $size = 40 - $len;
+            $bytes = $this->security->get_random_bytes($size);
+            $string .= substr(str_replace(['/', '+', '='], '', base64_encode($bytes)), 0, $size);
+        }
+        return $string;
     }
 }
