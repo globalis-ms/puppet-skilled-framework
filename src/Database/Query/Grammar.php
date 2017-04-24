@@ -1009,7 +1009,7 @@ class Grammar
      */
     public function getDateFormat()
     {
-        return 'Y-m-d H:i:s';
+        return 'Y-m-d H:i:s.u';
     }
     /**
      * Get the grammar's table prefix.

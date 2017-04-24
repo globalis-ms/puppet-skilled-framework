@@ -1563,7 +1563,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
         if ($this->getIncrementing()) {
             $this->insertAndSetId($query, $attributes);
-        } // If the table isn't incrementing we'll simply insert these attributes as they
+        }
+        // If the table isn't incrementing we'll simply insert these attributes as they
         // are. These attribute arrays must contain an "id" column previously placed
         // there by the developer as the manually determined key for these models.
         else {
@@ -1770,7 +1771,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function freshTimestamp()
     {
-        return new Carbon;
+        $t = microtime(true);
+        $micro = sprintf("%06d",($t - floor($t)) * 1000000);
+        return new Carbon(date('Y-m-d H:i:s.'.$micro, $t));
     }
 
     /**
@@ -2953,7 +2956,11 @@ abstract class Model implements ArrayAccess, JsonSerializable
             // Finally, we will just assume this date is in the format used by default on
             // the database connection and use that format to create the Carbon object
             // that is returned back out to the developers after we convert it here.
-            $return = Carbon::createFromFormat($this->getDateFormat(), $value);
+            if (preg_match('/\.[0-9]+$/', $value)) {
+                $return = Carbon::createFromFormat($this->getDateFormat(), $value);
+            } else {
+                $return = Carbon::createFromFormat($this->getDateFormat(), $value.'.000');
+            }
         }
 
         if (!$return->local) {

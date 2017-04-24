@@ -180,6 +180,7 @@ class Authentication extends \Globalis\PuppetSkilled\Service\Base
             ->where('token', $token)
             ->delete();
     }
+
     /**
      * Create a reset token
      *
