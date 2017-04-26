@@ -51,9 +51,9 @@ trait Revisionable
      */
     public function getOldAttributes()
     {
-        $attributes = $this->getRevisionableItems($this->original);
-
-        return $this->prepareAttributes($attributes);
+        $attributes = $this->prepareAttributes($this->original);
+        $attributes = $this->getRevisionableItems($attributes);
+        return $attributes;
     }
 
     /**
@@ -63,9 +63,9 @@ trait Revisionable
      */
     public function getNewAttributes()
     {
-        $attributes = $this->getRevisionableItems($this->attributes);
-
-        return $this->prepareAttributes($attributes);
+        $attributes = $this->prepareAttributes($this->attributes);
+        $attributes = $this->getRevisionableItems($attributes);
+        return $attributes;
     }
 
     /**
@@ -77,11 +77,16 @@ trait Revisionable
      */
     protected function prepareAttributes(array $attributes)
     {
-        return array_map(function ($attribute) {
-            return ($attribute instanceof DateTime)
-                ? $this->fromDateTime($attribute)
-                : (string) $attribute;
-        }, $attributes);
+        foreach ($attributes as $key => $attribute) {
+            if (in_array($key, $this->getDates()) && ! is_null($attribute)) {
+                $attribute = $this->asDateTime($attribute);
+            }
+            if ($attribute instanceof DateTime) {
+                $attribute = $this->fromDateTime($attribute);
+            }
+            $attributes[$key] = (string) $attribute;
+        }
+        return $attributes;
     }
 
     /**
