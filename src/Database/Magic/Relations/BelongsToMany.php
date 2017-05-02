@@ -954,7 +954,7 @@ class BelongsToMany extends Relation
             $attributes = $this->setTimestampsOnAttach($attributes, true);
         }
 
-        $updated = $this->newPivotStatementForId($id)->fill($attributes)->save();
+        $updated = $this->newPivotStatementForId($id)->update($attributes);
 
         if ($touch) {
             $this->touchIfTouching();
