@@ -1,6 +1,7 @@
 <?php
 namespace Globalis\PuppetSkilled\Database\Magic\Relations;
 
+use \ReflectionClass;
 use Globalis\PuppetSkilled\Database\Magic\Model;
 use Globalis\PuppetSkilled\Database\Magic\Builder;
 
@@ -35,6 +36,13 @@ class Pivot extends Model
     protected $guarded = [];
 
     /**
+     * The attributes that should be loaded into the pivot model.
+     *
+     * @var array
+     */
+    protected $include = [];
+
+    /**
      * Create a new pivot model instance.
      *
      * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $parent
@@ -57,6 +65,8 @@ class Pivot extends Model
         $this->forceFill($attributes);
 
         $this->syncOriginal();
+
+        $this->eagerLoadRelations();
 
         // We store off the parent instance so we will access the timestamp column names
         // for the model, since the pivot model timestamps aren't easily configurable
@@ -97,6 +107,28 @@ class Pivot extends Model
         $query->where($this->foreignKey, $this->getAttribute($this->foreignKey));
 
         return $query->where($this->otherKey, $this->getAttribute($this->otherKey));
+    }
+
+    /**
+     * Eager load any defined relations.
+     *
+     * @return null
+     */
+    protected function eagerLoadRelations()
+    {
+        foreach ($this->with as $relation) {
+            $this->relations[$relation] = $this->$relation()->getResults();
+        }
+    }
+
+    /**
+     * Retrieve columns required by custom pivot model.
+     *
+     * @return array
+     */
+    public static function getPivotColumns()
+    {
+        return (new ReflectionClass(static::class))->getDefaultProperties()['include'];
     }
 
     /**

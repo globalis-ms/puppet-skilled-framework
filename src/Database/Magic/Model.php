@@ -1866,8 +1866,12 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  bool  $exists
      * @return \Globalis\Database\Magic\Relations\Pivot
      */
-    public function newPivot(Model $parent, array $attributes, $table, $exists)
-    {
+    public function newPivot(Model $parent, array $attributes, $table, $exists, $using = null)
+     {
+        if ($using) {
+            return new $using($parent, $attributes, $table, $exists);
+        }
+
         return new Pivot($parent, $attributes, $table, $exists);
     }
 
