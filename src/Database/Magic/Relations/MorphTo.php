@@ -41,30 +41,16 @@ class MorphTo extends BelongsTo
      * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
      * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $parent
      * @param  string  $foreignKey
-     * @param  string  $otherKey
+     * @param  string  $ownerKey
      * @param  string  $type
      * @param  string  $relation
      * @return void
      */
-    public function __construct(Builder $query, Model $parent, $foreignKey, $otherKey, $type, $relation)
+    public function __construct(Builder $query, Model $parent, $foreignKey, $ownerKey, $type, $relation)
     {
         $this->morphType = $type;
 
-        parent::__construct($query, $parent, $foreignKey, $otherKey, $relation);
-    }
-
-    /**
-     * Get the results of the relationship.
-     *
-     * @return mixed
-     */
-    public function getResults()
-    {
-        if (! $this->otherKey) {
-            return;
-        }
-
-        return $this->query->first();
+        parent::__construct($query, $parent, $foreignKey, $ownerKey, $relation);
     }
 
     /**
@@ -94,45 +80,13 @@ class MorphTo extends BelongsTo
     }
 
     /**
-     * Match the eagerly loaded results to their parents.
+     * Get the results of the relationship.
      *
-     * @param  array   $models
-     * @param  array   $results
-     * @param  string  $relation
-     * @return array
+     * @return mixed
      */
-    public function match(array $models, array $results, $relation)
+    public function getResults()
     {
-        return $models;
-    }
-
-    /**
-     * Associate the model instance to the given parent.
-     *
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $model
-     * @return \Globalis\PuppetSkilled\Database\Magic\Model
-     */
-    public function associate($model)
-    {
-        $this->parent->setAttribute($this->foreignKey, $model->getKey());
-
-        $this->parent->setAttribute($this->morphType, $model->getMorphClass());
-
-        return $this->parent->setRelation($this->relation, $model);
-    }
-
-    /**
-     * Dissociate previously associated model from the given parent.
-     *
-     * @return \Globalis\PuppetSkilled\Database\Magic\Model
-     */
-    public function dissociate()
-    {
-        $this->parent->setAttribute($this->foreignKey, null);
-
-        $this->parent->setAttribute($this->morphType, null);
-
-        return $this->parent->setRelation($this->relation, null);
+        return $this->ownerKey ? $this->query->first() : null;
     }
 
     /**
@@ -152,24 +106,6 @@ class MorphTo extends BelongsTo
     }
 
     /**
-     * Match the results for a given type to their parents.
-     *
-     * @param  string  $type
-     * @param  array  $results
-     * @return void
-     */
-    protected function matchToMorphParents($type, array $results)
-    {
-        foreach ($results as $result) {
-            if (isset($this->dictionary[$type][$result->getKey()])) {
-                foreach ($this->dictionary[$type][$result->getKey()] as $model) {
-                    $model->setRelation($this->relation, $result);
-                }
-            }
-        }
-    }
-
-    /**
      * Get all of the relation results for a type.
      *
      * @param  string  $type
@@ -179,13 +115,19 @@ class MorphTo extends BelongsTo
     {
         $instance = $this->createModelByType($type);
 
+        $query = $this->replayMacros($instance->newQuery())
+                            ->mergeConstraintsFrom($this->getQuery())
+                            ->with($this->getQuery()->getEagerLoads());
+
         $key = $instance->getTable().'.'.$instance->getKeyName();
 
         $query = $this->replayMacros($instance->newQuery())
             ->mergeModelDefinedRelationConstraints($this->getQuery())
             ->with($this->getQuery()->getEagerLoads());
 
-        return $query->whereIn($key, $this->gatherKeysByType($type)->all())->get();
+        return $query->whereIn(
+            $instance->getTable().'.'.$instance->getKeyName(), $this->gatherKeysByType($type)
+        )->get();
     }
 
     /**
@@ -216,9 +158,68 @@ class MorphTo extends BelongsTo
      */
     public function createModelByType($type)
     {
-        $class = $this->parent->getActualClassNameForMorph($type);
-
+        $class = Model::getActualClassNameForMorph($type);
         return new $class;
+    }
+
+    /**
+     * Match the eagerly loaded results to their parents.
+     *
+     * @param  array   $models
+     * @param  array   $results
+     * @param  string  $relation
+     * @return array
+     */
+    public function match(array $models, array $results, $relation)
+    {
+        return $models;
+    }
+
+    /**
+     * Match the results for a given type to their parents.
+     *
+     * @param  string  $type
+     * @param  array  $results
+     * @return void
+     */
+    protected function matchToMorphParents($type, array $results)
+    {
+        foreach ($results as $result) {
+            if (isset($this->dictionary[$type][$result->getKey()])) {
+                foreach ($this->dictionary[$type][$result->getKey()] as $model) {
+                    $model->setRelation($this->relation, $result);
+                }
+            }
+        }
+    }
+
+   /**
+     * Associate the model instance to the given parent.
+     *
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $model
+     * @return \Globalis\PuppetSkilled\Database\Magic\Model
+     */
+    public function associate($model)
+    {
+        $this->parent->setAttribute($this->foreignKey, $model->getKey());
+
+        $this->parent->setAttribute($this->morphType, $model->getMorphClass());
+
+        return $this->parent->setRelation($this->relation, $model);
+    }
+
+    /**
+     * Dissociate previously associated model from the given parent.
+     *
+     * @return \Globalis\PuppetSkilled\Database\Magic\Model
+     */
+    public function dissociate()
+    {
+        $this->parent->setAttribute($this->foreignKey, null);
+
+        $this->parent->setAttribute($this->morphType, null);
+
+        return $this->parent->setRelation($this->relation, null);
     }
 
     /**
@@ -250,7 +251,7 @@ class MorphTo extends BelongsTo
     protected function replayMacros(Builder $query)
     {
         foreach ($this->macroBuffer as $macro) {
-            call_user_func_array([$query, $macro['method']], $macro['parameters']);
+            $query->{$macro['method']}(...$macro['parameters']);
         }
 
         return $query;

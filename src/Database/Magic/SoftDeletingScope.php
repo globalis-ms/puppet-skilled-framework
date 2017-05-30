@@ -8,7 +8,7 @@ class SoftDeletingScope implements Scope
      *
      * @var array
      */
-    protected $extensions = ['ForceDelete', 'Restore', 'WithTrashed', 'WithoutTrashed', 'OnlyTrashed'];
+    protected $extensions = ['Restore', 'WithTrashed', 'WithoutTrashed', 'OnlyTrashed'];
 
     /**
      * Apply the scope to a given Eloquent query builder.
@@ -56,19 +56,6 @@ class SoftDeletingScope implements Scope
         }
 
         return $builder->getModel()->getDeletedAtColumn();
-    }
-
-    /**
-     * Add the force delete extension to the builder.
-     *
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $builder
-     * @return void
-     */
-    protected function addForceDelete(Builder $builder)
-    {
-        $builder->macro('forceDelete', function (Builder $builder) {
-            return $builder->getQuery()->delete();
-        });
     }
 
     /**

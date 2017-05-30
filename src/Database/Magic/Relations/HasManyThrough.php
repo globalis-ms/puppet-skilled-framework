@@ -3,12 +3,18 @@ namespace Globalis\PuppetSkilled\Database\Magic\Relations;
 
 use Globalis\PuppetSkilled\Database\Magic\Model;
 use Globalis\PuppetSkilled\Database\Magic\Builder;
-use Globalis\PuppetSkilled\Database\Query\Expression;
 use Globalis\PuppetSkilled\Database\Magic\SoftDeletes;
 use RuntimeException;
 
 class HasManyThrough extends Relation
 {
+    /**
+     * The "through" parent model instance.
+     *
+     * @var \Globalis\PuppetSkilled\Database\Magic\Model
+     */
+    protected $throughParent;
+
     /**
      * The distance parent model instance.
      *
@@ -42,20 +48,21 @@ class HasManyThrough extends Relation
      *
      * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
      * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $farParent
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $parent
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $throughParent
      * @param  string  $firstKey
      * @param  string  $secondKey
      * @param  string  $localKey
      * @return void
      */
-    public function __construct(Builder $query, Model $farParent, Model $parent, $firstKey, $secondKey, $localKey)
+    public function __construct(Builder $query, Model $farParent, Model $throughParent, $firstKey, $secondKey, $localKey)
     {
         $this->localKey = $localKey;
         $this->firstKey = $firstKey;
         $this->secondKey = $secondKey;
         $this->farParent = $farParent;
+        $this->throughParent = $throughParent;
 
-        parent::__construct($query, $parent);
+        parent::__construct($query, $throughParent);
     }
 
     /**
@@ -65,65 +72,43 @@ class HasManyThrough extends Relation
      */
     public function addConstraints()
     {
-        $parentTable = $this->parent->getTable();
-
         $localValue = $this->farParent[$this->localKey];
 
-        $this->setJoin();
+        $this->performJoin();
 
         if (static::$constraints) {
-            $this->query->where($parentTable.'.'.$this->firstKey, '=', $localValue);
+            $this->query->where($this->getQualifiedFirstKeyName(), '=', $localValue);
         }
     }
-
-    /**
-     * Add the constraints for a relationship query.
-     *
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parent
-     * @param  array|mixed  $columns
-     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
-     */
-    public function getRelationQuery(Builder $query, Builder $parent, $columns = ['*'])
-    {
-        $parentTable = $this->parent->getTable();
-
-        $this->setJoin($query);
-
-        $query->select($columns);
-
-        $key = $this->wrap($parentTable.'.'.$this->firstKey);
-
-        return $query->where($this->getHasCompareKey(), '=', new Expression($key));
-    }
-
     /**
      * Set the join clause on the query.
      *
      * @param  \Globalis\PuppetSkilled\Database\Magic\Builder|null  $query
      * @return void
      */
-    protected function setJoin(Builder $query = null)
+    protected function performJoin(Builder $query = null)
     {
         $query = $query ?: $this->query;
 
-        $foreignKey = $this->related->getTable().'.'.$this->secondKey;
+        $farKey = $this->getQualifiedFarKeyName();
 
-        $query->join($this->parent->getTable(), $this->getQualifiedParentKeyName(), '=', $foreignKey);
+        $query->join($this->throughParent->getTable(), $this->getQualifiedParentKeyName(), '=', $farKey);
 
-        if ($this->parentSoftDeletes()) {
-            $query->whereNull($this->parent->getQualifiedDeletedAtColumn());
+        if ($this->throughParentSoftDeletes()) {
+            $query->whereNull($this->throughParent->getQualifiedDeletedAtColumn());
         }
     }
 
     /**
-     * Determine whether close parent of the relation uses Soft Deletes.
+     * Determine whether "through" parent of the relation uses Soft Deletes.
      *
      * @return bool
      */
-    public function parentSoftDeletes()
+    public function throughParentSoftDeletes()
     {
-        return in_array(SoftDeletes::class, class_uses_recursive(get_class($this->parent)));
+        return in_array(SoftDeletes::class, class_uses_recursive(
+            get_class($this->throughParent)
+        ));
     }
 
     /**
@@ -134,9 +119,9 @@ class HasManyThrough extends Relation
      */
     public function addEagerConstraints(array $models)
     {
-        $table = $this->parent->getTable();
-
-        $this->query->whereIn($table.'.'.$this->firstKey, $this->getKeys($models, $this->localKey));
+        $this->query->whereIn(
+            $this->getQualifiedFirstKeyName(), $this->getKeys($models, $this->localKey)
+        );
     }
 
     /**
@@ -159,7 +144,7 @@ class HasManyThrough extends Relation
      * Match the eagerly loaded results to their parents.
      *
      * @param  array   $models
-     * @param  array   $results
+     * @param  array  $results
      * @param  string  $relation
      * @return array
      */
@@ -171,12 +156,10 @@ class HasManyThrough extends Relation
         // link them up with their children using the keyed dictionary to make the
         // matching very convenient and easy work. Then we'll just return them.
         foreach ($models as $model) {
-            $key = $model->getKey();
-
-            if (isset($dictionary[$key])) {
-                $value = $dictionary[$key];
-
-                $model->setRelation($relation, $value);
+            if (isset($dictionary[$key = $model->getKey()])) {
+                $model->setRelation(
+                    $relation, $dictionary[$key]
+                );
             }
         }
 
@@ -193,114 +176,14 @@ class HasManyThrough extends Relation
     {
         $dictionary = [];
 
-        $foreign = $this->firstKey;
-
         // First we will create a dictionary of models keyed by the foreign key of the
         // relationship as this will allow us to quickly access all of the related
         // models without having to do nested looping which will be quite slow.
         foreach ($results as $result) {
-            $dictionary[$result->{$foreign}][] = $result;
+            $dictionary[$result->{$this->firstKey}][] = $result;
         }
 
         return $dictionary;
-    }
-
-    /**
-     * Get the results of the relationship.
-     *
-     * @return mixed
-     */
-    public function getResults()
-    {
-        return $this->get();
-    }
-
-    /**
-     * Execute the query and get the first related model.
-     *
-     * @param  array   $columns
-     * @return mixed
-     */
-    public function first($columns = ['*'])
-    {
-        $results = $this->take(1)->get($columns);
-
-        return isset($results[0]) ? $results[0] : null;
-    }
-
-    /**
-     * Execute the query and get the first result or throw an exception.
-     *
-     * @param  array  $columns
-     * @return \Globalis\PuppetSkilled\Database\Magic\Model|static
-     *
-     * @throws RuntimeException
-     */
-    public function firstOrFail($columns = ['*'])
-    {
-        if (! is_null($model = $this->first($columns))) {
-            return $model;
-        }
-        throw new RuntimeException("No query results for model [".get_class($this->parent)."]");
-    }
-
-    /**
-     * Find a related model by its primary key.
-     *
-     * @param  mixed  $id
-     * @param  array  $columns
-     * @return \Globalis\PuppetSkilled\Database\Magic\Model|array|null
-     */
-    public function find($id, $columns = ['*'])
-    {
-        if (is_array($id)) {
-            return $this->findMany($id, $columns);
-        }
-
-        $this->where($this->getRelated()->getQualifiedKeyName(), '=', $id);
-
-        return $this->first($columns);
-    }
-
-    /**
-     * Find multiple related models by their primary keys.
-     *
-     * @param  mixed  $ids
-     * @param  array  $columns
-     * @return array
-     */
-    public function findMany($ids, $columns = ['*'])
-    {
-        if (empty($ids)) {
-            return [];
-        }
-
-        $this->whereIn($this->getRelated()->getQualifiedKeyName(), $ids);
-
-        return $this->get($columns);
-    }
-
-    /**
-     * Find a related model by its primary key or throw an exception.
-     *
-     * @param  mixed  $id
-     * @param  array  $columns
-     * @return \Globalis\PuppetSkilled\Database\Magic\Model|[]
-     *
-     * @throws RuntimeException
-     */
-    public function findOrFail($id, $columns = ['*'])
-    {
-        $result = $this->find($id, $columns);
-
-        if (is_array($id)) {
-            if (count($result) == count(array_unique($id))) {
-                return $result;
-            }
-        } elseif (! is_null($result)) {
-            return $result;
-        }
-        throw new RuntimeException("No query results for model [".get_class($this->parent)."]");
     }
 
     /**
@@ -323,7 +206,6 @@ class HasManyThrough extends Relation
      *
      * @param  array  $attributes
      * @param  array  $values
-     * @param  bool   $touch
      * @return \Globalis\PuppetSkilled\Database\Magic\Model
      */
     public function updateOrCreate(array $attributes, array $values = [])
@@ -333,6 +215,104 @@ class HasManyThrough extends Relation
         $instance->fill($values)->save();
 
         return $instance;
+    }
+
+    /**
+     * Execute the query and get the first related model.
+     *
+     * @param  array   $columns
+     * @return mixed
+     */
+    public function first($columns = ['*'])
+    {
+        $results = $this->take(1)->get($columns);
+
+        return count($results) > 0 ? $results->first() : null;
+    }
+
+    /**
+     * Execute the query and get the first result or throw an exception.
+     *
+     * @param  array  $columns
+     * @return \Globalis\PuppetSkilled\Database\Magic\Model|static
+     *
+     * @throws \RuntimeException
+     */
+    public function firstOrFail($columns = ['*'])
+    {
+        if (! is_null($model = $this->first($columns))) {
+            return $model;
+        }
+        throw new RuntimeException('No query results for model [' . get_class($this->related) . ']');
+    }
+
+    /**
+     * Find a related model by its primary key.
+     *
+     * @param  mixed  $id
+     * @param  array  $columns
+     * @return \Globalis\PuppetSkilled\Database\Magic\Model|array|null
+     */
+    public function find($id, $columns = ['*'])
+    {
+        if (is_array($id)) {
+            return $this->findMany($id, $columns);
+        }
+
+        return $this->where(
+            $this->getRelated()->getQualifiedKeyName(), '=', $id
+        )->first($columns);
+    }
+
+    /**
+     * Find multiple related models by their primary keys.
+     *
+     * @param  mixed  $ids
+     * @param  array  $columns
+     * @return array
+     */
+    public function findMany($ids, $columns = ['*'])
+    {
+        if (empty($ids)) {
+            return [];
+        }
+
+        return $this->whereIn(
+            $this->getRelated()->getQualifiedKeyName(), $ids
+        )->get($columns);
+    }
+
+    /**
+     * Find a related model by its primary key or throw an exception.
+     *
+     * @param  mixed  $id
+     * @param  array  $columns
+     * @return \Globalis\PuppetSkilled\Database\Magic\Model|array
+     *
+     * throws
+     */
+    public function findOrFail($id, $columns = ['*'])
+    {
+        $result = $this->find($id, $columns);
+
+        if (is_array($id)) {
+            if (count($result) == count(array_unique($id))) {
+                return $result;
+            }
+        } elseif (! is_null($result)) {
+            return $result;
+        }
+        throw new RuntimeException('No query results for model [' . get_class($this->related) . ']');
+    }
+
+    /**
+     * Get the results of the relationship.
+     *
+     * @return mixed
+     */
+    public function getResults()
+    {
+        return $this->get();
     }
 
     /**
@@ -348,11 +328,11 @@ class HasManyThrough extends Relation
         // models with the result of those columns as a separate model relation.
         $columns = $this->query->getQuery()->columns ? [] : $columns;
 
-        $select = $this->getSelectColumns($columns);
-
         $builder = $this->query->applyScopes();
 
-        $models = $builder->addSelect($select)->getModels();
+        $models = $builder->addSelect(
+            $this->shouldSelect($columns)
+        )->getModels();
 
         // If we actually found models we will also eager load any relationships that
         // have been specified as needing to be eager loaded. This will solve the
@@ -370,13 +350,30 @@ class HasManyThrough extends Relation
      * @param  array  $columns
      * @return array
      */
-    protected function getSelectColumns(array $columns = ['*'])
+    protected function shouldSelect(array $columns = ['*'])
     {
         if ($columns == ['*']) {
             $columns = [$this->related->getTable().'.*'];
         }
 
-        return array_merge($columns, [$this->parent->getTable().'.'.$this->firstKey]);
+        return array_merge($columns, [$this->getQualifiedFirstKeyName()]);
+    }
+
+    /**
+     * Add the constraints for a relationship query.
+     *
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parentQuery
+     * @param  array|mixed  $columns
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
+     */
+    public function getRelationExistenceQuery(Builder $query, Builder $parentQuery, $columns = ['*'])
+    {
+        $this->performJoin($query);
+
+        return $query->select($columns)->whereColumn(
+            $this->getExistenceCompareKey(), '=', $this->getQualifiedFirstKeyName()
+        );
     }
 
     /**
@@ -384,7 +381,7 @@ class HasManyThrough extends Relation
      *
      * @return string
      */
-    public function getHasCompareKey()
+    public function getExistenceCompareKey()
     {
         return $this->farParent->getQualifiedKeyName();
     }
@@ -394,7 +391,17 @@ class HasManyThrough extends Relation
      *
      * @return string
      */
-    public function getForeignKey()
+    public function getQualifiedFarKeyName()
+    {
+        return $this->getQualifiedForeignKeyName();
+    }
+
+    /**
+     * Get the qualified foreign key on the related model.
+     *
+     * @return string
+     */
+    public function getQualifiedForeignKeyName()
     {
         return $this->related->getTable().'.'.$this->secondKey;
     }
@@ -404,8 +411,8 @@ class HasManyThrough extends Relation
      *
      * @return string
      */
-    public function getThroughKey()
+    public function getQualifiedFirstKeyName()
     {
-        return $this->parent->getTable().'.'.$this->firstKey;
+        return $this->throughParent->getTable().'.'.$this->firstKey;
     }
 }

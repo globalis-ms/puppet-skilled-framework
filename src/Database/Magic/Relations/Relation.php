@@ -60,6 +60,28 @@ abstract class Relation
     }
 
     /**
+     * Run a callback with constraints disabled on the relation.
+     *
+     * @param  \Closure  $callback
+     * @return mixed
+     */
+    public static function noConstraints(Closure $callback)
+    {
+        $previous = static::$constraints;
+
+        static::$constraints = false;
+
+        // When resetting the relation where clause, we want to shift the first element
+        // off of the bindings, leaving only the constraints that the developers put
+        // as "extra" on the relationships, and not original relation constraints.
+        try {
+            return call_user_func($callback);
+        } finally {
+            static::$constraints = $previous;
+        }
+    }
+
+    /**
      * Set the base constraints on the relation query.
      *
      * @return void
@@ -137,53 +159,31 @@ abstract class Relation
      * Add the constraints for a relationship count query.
      *
      * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parent
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parentQuery
      * @return \Globalis\PuppetSkilled\Database\Magic\Builder
      */
-    public function getRelationCountQuery(Builder $query, Builder $parent)
+    public function getRelationExistenceCountQuery(Builder $query, Builder $parentQuery)
     {
-        return $this->getRelationQuery($query, $parent, new Expression('count(*)'));
+        return $this->getRelationExistenceQuery(
+            $query, $parentQuery, new Expression('count(*)')
+        );
     }
 
     /**
-     * Add the constraints for a relationship query.
+     * Add the constraints for an internal relationship existence query.
+     *
+     * Essentially, these queries compare on column names like whereColumn.
      *
      * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parent
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parentQuery
      * @param  array|mixed $columns
      * @return \Globalis\PuppetSkilled\Database\Magic\Builder
      */
-    public function getRelationQuery(Builder $query, Builder $parent, $columns = ['*'])
+    public function getRelationExistenceQuery(Builder $query, Builder $parentQuery, $columns = ['*'])
     {
-        $query->select($columns);
-
-        $key = $this->wrap($this->getQualifiedParentKeyName());
-
-        return $query->where($this->getHasCompareKey(), '=', new Expression($key));
-    }
-
-    /**
-     * Run a callback with constraints disabled on the relation.
-     *
-     * @param  \Closure  $callback
-     * @return mixed
-     */
-    public static function noConstraints(Closure $callback)
-    {
-        $previous = static::$constraints;
-
-        static::$constraints = false;
-
-        // When resetting the relation where clause, we want to shift the first element
-        // off of the bindings, leaving only the constraints that the developers put
-        // as "extra" on the relationships, and not original relation constraints.
-        try {
-            $results = call_user_func($callback);
-        } finally {
-            static::$constraints = $previous;
-        }
-
-        return $results;
+        return $query->select($columns)->whereColumn(
+            $this->getQualifiedParentKeyName(), '=', $this->getExistenceCompareKey()
+        );
     }
 
     /**
@@ -278,17 +278,6 @@ abstract class Relation
     public function relatedUpdatedAt()
     {
         return $this->related->getUpdatedAtColumn();
-    }
-
-    /**
-     * Wrap the given value with the parent query's grammar.
-     *
-     * @param  string  $value
-     * @return string
-     */
-    public function wrap($value)
-    {
-        return $this->parent->newQueryWithoutScopes()->getQuery()->getGrammar()->wrap($value);
     }
 
     /**

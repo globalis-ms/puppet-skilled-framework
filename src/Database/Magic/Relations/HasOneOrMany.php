@@ -46,6 +46,20 @@ abstract class HasOneOrMany extends Relation
     }
 
     /**
+     * Create and return an un-saved instance of the related model.
+     *
+     * @param  array  $attributes
+     * @return \Globalis\PuppetSkilled\Database\Magic\Model
+     */
+    public function make(array $attributes = [])
+    {
+        $instance = $this->related->newInstance($attributes);
+        $instance->setAttribute($this->getForeignKeyName(), $this->getParentKey());
+        return $instance;
+    }
+
+
+    /**
      * Set the base constraints on the relation query.
      *
      * @return void
@@ -60,54 +74,6 @@ abstract class HasOneOrMany extends Relation
     }
 
     /**
-     * Add the constraints for a relationship query.
-     *
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parent
-     * @param  array|mixed  $columns
-     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
-     */
-    public function getRelationQuery(Builder $query, Builder $parent, $columns = ['*'])
-    {
-        if ($parent->getQuery()->from == $query->getQuery()->from) {
-            return $this->getRelationQueryForSelfRelation($query, $parent, $columns);
-        }
-
-        return parent::getRelationQuery($query, $parent, $columns);
-    }
-
-    /**
-     * Add the constraints for a relationship query on the same table.
-     *
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parent
-     * @param  array|mixed  $columns
-     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
-     */
-    public function getRelationQueryForSelfRelation(Builder $query, Builder $parent, $columns = ['*'])
-    {
-        $query->select($columns);
-
-        $query->from($query->getModel()->getTable().' as '.$hash = $this->getRelationCountHash());
-
-        $query->getModel()->setTable($hash);
-
-        $key = $this->wrap($this->getQualifiedParentKeyName());
-
-        return $query->where($hash.'.'.$this->getPlainForeignKey(), '=', new Expression($key));
-    }
-
-    /**
-     * Get a relationship join table hash.
-     *
-     * @return string
-     */
-    public function getRelationCountHash()
-    {
-        return 'puppetskilled_reserved_'.static::$selfJoinCount++;
-    }
-
-    /**
      * Set the constraints for an eager load of the relation.
      *
      * @param  array  $models
@@ -115,10 +81,11 @@ abstract class HasOneOrMany extends Relation
      */
     public function addEagerConstraints(array $models)
     {
-        $this->query->whereIn($this->foreignKey, $this->getKeys($models, $this->localKey));
+        $this->query->whereIn(
+            $this->foreignKey, $this->getKeys($models, $this->localKey)
+        );
     }
-
-    /**
+        /**
      * Match the eagerly loaded results to their single parents.
      *
      * @param  array   $models
@@ -198,7 +165,7 @@ abstract class HasOneOrMany extends Relation
     {
         $dictionary = [];
 
-        $foreign = $this->getPlainForeignKey();
+        $foreign = $this->getForeignKeyName();
 
         // First we will create a dictionary of models keyed by the foreign key of the
         // relationship as this will allow us to quickly access all of the related
@@ -208,34 +175,6 @@ abstract class HasOneOrMany extends Relation
         }
 
         return $dictionary;
-    }
-
-    /**
-     * Attach a model instance to the parent model.
-     *
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $model
-     * @return \Globalis\PuppetSkilled\Database\Magic\Model
-     */
-    public function save(Model $model)
-    {
-        $model->setAttribute($this->getPlainForeignKey(), $this->getParentKey());
-
-        return $model->save() ? $model : false;
-    }
-
-    /**
-     * Attach a collection of models to the parent instance.
-     *
-     * @param  \Traversable|array  $models
-     * @return \Traversable|array
-     */
-    public function saveMany($models)
-    {
-        foreach ($models as $model) {
-            $this->save($model);
-        }
-
-        return $models;
     }
 
     /**
@@ -250,7 +189,7 @@ abstract class HasOneOrMany extends Relation
         if (is_null($instance = $this->find($id, $columns))) {
             $instance = $this->related->newInstance();
 
-            $instance->setAttribute($this->getPlainForeignKey(), $this->getParentKey());
+            $instance->setAttribute($this->getForeignKeyName(), $this->getParentKey());
         }
 
         return $instance;
@@ -267,7 +206,7 @@ abstract class HasOneOrMany extends Relation
         if (is_null($instance = $this->where($attributes)->first())) {
             $instance = $this->related->newInstance($attributes);
 
-            $instance->setAttribute($this->getPlainForeignKey(), $this->getParentKey());
+            $instance->setAttribute($this->getForeignKeyName(), $this->getParentKey());
         }
 
         return $instance;
@@ -298,12 +237,38 @@ abstract class HasOneOrMany extends Relation
     public function updateOrCreate(array $attributes, array $values = [])
     {
         $instance = $this->firstOrNew($attributes);
-
         $instance->fill($values);
-
         $instance->save();
 
         return $instance;
+    }
+
+    /**
+     * Attach a model instance to the parent model.
+     *
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $model
+     * @return \Globalis\PuppetSkilled\Database\Magic\Model
+     */
+    public function save(Model $model)
+    {
+        $model->setAttribute($this->getForeignKeyName(), $this->getParentKey());
+
+        return $model->save() ? $model : false;
+    }
+
+    /**
+     * Attach a collection of models to the parent instance.
+     *
+     * @param  \Traversable|array  $models
+     * @return \Traversable|array
+     */
+    public function saveMany($models)
+    {
+        foreach ($models as $model) {
+            $this->save($model);
+        }
+
+        return $models;
     }
 
     /**
@@ -318,9 +283,7 @@ abstract class HasOneOrMany extends Relation
         // that we do not have to worry about a mass accessor rules blocking sets
         // on the models. Otherwise, some of these attributes will not get set.
         $instance = $this->related->newInstance($attributes);
-
-        $instance->setAttribute($this->getPlainForeignKey(), $this->getParentKey());
-
+        $instance->setAttribute($this->getForeignKeyName(), $this->getParentKey());
         $instance->save();
 
         return $instance;
@@ -359,35 +322,59 @@ abstract class HasOneOrMany extends Relation
     }
 
     /**
+     * Add the constraints for a relationship query.
+     *
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parentQuery
+     * @param  array|mixed  $columns
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
+     */
+    public function getRelationExistenceQuery(Builder $query, Builder $parentQuery, $columns = ['*'])
+    {
+        if ($query->getQuery()->from == $parentQuery->getQuery()->from) {
+            return $this->getRelationExistenceQueryForSelfRelation($query, $parentQuery, $columns);
+        }
+
+        return parent::getRelationExistenceQuery($query, $parentQuery, $columns);
+    }
+
+    /**
+     * Add the constraints for a relationship query on the same table.
+     *
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parentQuery
+     * @param  array|mixed  $columns
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
+     */
+    public function getRelationExistenceQueryForSelfRelation(Builder $query, Builder $parentQuery, $columns = ['*'])
+    {
+        $query->from($query->getModel()->getTable().' as '.$hash = $this->getRelationCountHash());
+
+        $query->getModel()->setTable($hash);
+
+        return $query->select($columns)->whereColumn(
+            $this->getQualifiedParentKeyName(), '=', $hash.'.'.$this->getForeignKeyName()
+        );
+    }
+
+    /**
+     * Get a relationship join table hash.
+     *
+     * @return string
+     */
+    public function getRelationCountHash()
+    {
+        return 'puppet_reserved_'.static::$selfJoinCount++;
+    }
+
+    /**
      * Get the key for comparing against the parent key in "has" query.
      *
      * @return string
      */
-    public function getHasCompareKey()
+    public function getExistenceCompareKey()
     {
-        return $this->getForeignKey();
-    }
-
-    /**
-     * Get the foreign key for the relationship.
-     *
-     * @return string
-     */
-    public function getForeignKey()
-    {
-        return $this->foreignKey;
-    }
-
-    /**
-     * Get the plain foreign key.
-     *
-     * @return string
-     */
-    public function getPlainForeignKey()
-    {
-        $segments = explode('.', $this->getForeignKey());
-
-        return $segments[count($segments) - 1];
+        return $this->getQualifiedForeignKeyName();
     }
 
     /**
@@ -408,5 +395,27 @@ abstract class HasOneOrMany extends Relation
     public function getQualifiedParentKeyName()
     {
         return $this->parent->getTable().'.'.$this->localKey;
+    }
+
+    /**
+     * Get the plain foreign key.
+     *
+     * @return string
+     */
+    public function getForeignKeyName()
+    {
+        $segments = explode('.', $this->getQualifiedForeignKeyName());
+
+        return $segments[count($segments) - 1];
+    }
+
+    /**
+     * Get the foreign key for the relationship.
+     *
+     * @return string
+     */
+    public function getQualifiedForeignKeyName()
+    {
+        return $this->foreignKey;
     }
 }

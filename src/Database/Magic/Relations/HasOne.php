@@ -10,22 +10,10 @@ class HasOne extends HasOneOrMany
      *
      * Alternatively, may be a Closure to execute to retrieve default value.
      *
-     * @var \Closure|bool
+     * @var \Closure|array|bool
      */
     protected $withDefault;
 
-    /**
-     * Return a new model instance in case the relationship does not exist.
-     *
-     * @param  \Closure|bool  $callback
-     * @return $this
-     */
-    public function withDefault($callback = true)
-    {
-        $this->withDefault = $callback;
-
-        return $this;
-    }
 
     /**
      * Get the results of the relationship.
@@ -54,19 +42,6 @@ class HasOne extends HasOneOrMany
     }
 
     /**
-     * Match the eagerly loaded results to their parents.
-     *
-     * @param  array  $models
-     * @param  array  $results
-     * @param  string  $relation
-     * @return array
-     */
-    public function match(array $models, array $results, $relation)
-    {
-        return $this->matchOne($models, $results, $relation);
-    }
-
-    /**
      * Get the default value for this relation.
      *
      * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $model
@@ -92,5 +67,31 @@ class HasOne extends HasOneOrMany
         }
 
         return $instance;
+    }
+
+    /**
+     * Match the eagerly loaded results to their parents.
+     *
+     * @param  array  $models
+     * @param  array  $results
+     * @param  string  $relation
+     * @return array
+     */
+    public function match(array $models, array $results, $relation)
+    {
+        return $this->matchOne($models, $results, $relation);
+    }
+
+    /**
+     * Return a new model instance in case the relationship does not exist.
+     *
+     * @param  \Closure|array|bool  $callback
+     * @return $this
+     */
+    public function withDefault($callback = true)
+    {
+        $this->withDefault = $callback;
+
+        return $this;
     }
 }

@@ -40,6 +40,19 @@ abstract class MorphOneOrMany extends HasOneOrMany
     }
 
     /**
+     * Create and return an un-saved instance of the related model.
+     *
+     * @param  array  $attributes
+     * @return \Globalis\PuppetSkilled\Database\Magic\Model
+     */
+    public function make(array $attributes = [])
+    {
+        $instance = $this->related->newInstance($attributes);
+        $this->setForeignAttributesForCreate($instance);
+        return $instance;
+    }
+
+    /**
      * Set the base constraints on the relation query.
      *
      * @return void
@@ -54,21 +67,6 @@ abstract class MorphOneOrMany extends HasOneOrMany
     }
 
     /**
-     * Get the relationship query.
-     *
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parent
-     * @param  array|mixed  $columns
-     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
-     */
-    public function getRelationQuery(Builder $query, Builder $parent, $columns = ['*'])
-    {
-        $query = parent::getRelationQuery($query, $parent, $columns);
-
-        return $query->where($this->morphType, $this->morphClass);
-    }
-
-    /**
      * Set the constraints for an eager load of the relation.
      *
      * @param  array  $models
@@ -79,19 +77,6 @@ abstract class MorphOneOrMany extends HasOneOrMany
         parent::addEagerConstraints($models);
 
         $this->query->where($this->morphType, $this->morphClass);
-    }
-
-    /**
-     * Attach a model instance to the parent model.
-     *
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $model
-     * @return \Globalis\PuppetSkilled\Database\Magic\Model
-     */
-    public function save(Model $model)
-    {
-        $model->setAttribute($this->getPlainMorphType(), $this->morphClass);
-
-        return parent::save($model);
     }
 
     /**
@@ -169,6 +154,19 @@ abstract class MorphOneOrMany extends HasOneOrMany
     }
 
     /**
+     * Attach a model instance to the parent model.
+     *
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $model
+     * @return \Globalis\PuppetSkilled\Database\Magic\Model
+     */
+    public function save(Model $model)
+    {
+        $model->setAttribute($this->getMorphType(), $this->morphClass);
+
+        return parent::save($model);
+    }
+
+    /**
      * Create a new instance of the related model.
      *
      * @param  array  $attributes
@@ -188,6 +186,40 @@ abstract class MorphOneOrMany extends HasOneOrMany
         return $instance;
     }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /**
+     * Get the relationship query.
+     *
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parent
+     * @param  array|mixed  $columns
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
+     */
+    public function getRelationQuery(Builder $query, Builder $parent, $columns = ['*'])
+    {
+        $query = parent::getRelationQuery($query, $parent, $columns);
+
+        return $query->where($this->morphType, $this->morphClass);
+    }
+
     /**
      * Set the foreign ID and type for creating a related model.
      *
@@ -196,10 +228,23 @@ abstract class MorphOneOrMany extends HasOneOrMany
      */
     protected function setForeignAttributesForCreate(Model $model)
     {
-        $model->{$this->getPlainForeignKey()} = $this->getParentKey();
-        $type = explode('.', $this->morphType);
-        $type = end($type);
-        $model->{$type} = $this->morphClass;
+        $model->{$this->getForeignKeyName()} = $this->getParentKey();
+        $model->{$this->getMorphType()} = $this->morphClass;
+    }
+
+    /**
+     * Get the relationship query.
+     *
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $parentQuery
+     * @param  array|mixed  $columns
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
+     */
+    public function getRelationExistenceQuery(Builder $query, Builder $parentQuery, $columns = ['*'])
+    {
+        return parent::getRelationExistenceQuery($query, $parentQuery, $columns)->where(
+            $this->morphType, $this->morphClass
+        );
     }
 
     /**
@@ -207,7 +252,7 @@ abstract class MorphOneOrMany extends HasOneOrMany
      *
      * @return string
      */
-    public function getMorphType()
+    public function getQualifiedMorphType()
     {
         return $this->morphType;
     }
@@ -217,11 +262,10 @@ abstract class MorphOneOrMany extends HasOneOrMany
      *
      * @return string
      */
-    public function getPlainMorphType()
+    public function getMorphType()
     {
-        $return = explode('.', $this->morphType);
-        $return = end($return);
-        return $return;
+        $tmp = explode('.', $this->morphType);
+        return end($tmp);
     }
 
     /**

@@ -1,7 +1,7 @@
 {
     "description": "Puppet Skilled framework",
     "name": "globalis/puppet-skilled-framework",
-    "type": "project",
+    "type": "library",
     "homepage": "https://globalis-ms.com",
     "require": {
         "php": ">=5.6",

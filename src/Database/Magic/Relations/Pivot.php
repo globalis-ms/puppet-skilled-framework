@@ -1,7 +1,6 @@
 <?php
 namespace Globalis\PuppetSkilled\Database\Magic\Relations;
 
-use \ReflectionClass;
 use Globalis\PuppetSkilled\Database\Magic\Model;
 use Globalis\PuppetSkilled\Database\Magic\Builder;
 
@@ -26,7 +25,7 @@ class Pivot extends Model
      *
      * @var string
      */
-    protected $otherKey;
+    protected $relatedKey;
 
     /**
      * The attributes that aren't mass assignable.
@@ -45,37 +44,48 @@ class Pivot extends Model
     /**
      * Create a new pivot model instance.
      *
-     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $parent
      * @param  array   $attributes
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $parent
      * @param  string  $table
      * @param  bool    $exists
      * @return void
      */
-    public function __construct(Model $parent, $attributes, $table, $exists = false)
+    public function __construct($attributes = [], Model $parent = null, $table = '', $exists = false)
     {
         parent::__construct();
 
-        // The pivot model is a "dynamic" model since we will set the tables dynamically
-        // for the instance. This allows it work for any intermediate tables for the
-        // many to many relationship that are defined by this developer's classes.
-        $this->setTable($table);
+        if ($parent !== null) {
+            // The pivot model is a "dynamic" model since we will set the tables dynamically
+            // for the instance. This allows it work for any intermediate tables for the
+            // many to many relationship that are defined by this developer's classes.
+            $this->setConnection($parent->getConnectionName())
+                ->setTable($table)
+                ->forceFill($attributes)
+                ->syncOriginal();
 
-        $this->setConnection($parent->getConnectionName());
+            // We store off the parent instance so we will access the timestamp column names
+            // for the model, since the pivot model timestamps aren't easily configurable
+            // from the developer's point of view. We can use the parents to get these.
+            $this->parent = $parent;
 
-        $this->forceFill($attributes);
+            $this->exists = $exists;
 
-        $this->syncOriginal();
+            $this->timestamps = $this->hasTimestampAttributes();
+        }
+    }
 
-        $this->eagerLoadRelations();
-
-        // We store off the parent instance so we will access the timestamp column names
-        // for the model, since the pivot model timestamps aren't easily configurable
-        // from the developer's point of view. We can use the parents to get these.
-        $this->parent = $parent;
-
-        $this->exists = $exists;
-
-        $this->timestamps = $this->hasTimestampAttributes();
+    /**
+     * Create a new instance of the given model.
+     *
+     * @param  array  $attributes
+     * @param  bool  $exists
+     * @return static
+     */
+    public function newInstance($attributes = [], $exists = false)
+    {
+        $model = new static((array) $attributes, $this->parent, $this->table, $exists);
+        $model->setPivotKeys($this->getForeignKey(), $this->getRelatedKey());
+        return $model;
     }
 
     /**
@@ -89,7 +99,7 @@ class Pivot extends Model
      */
     public static function fromRawAttributes(Model $parent, $attributes, $table, $exists = false)
     {
-        $instance = new static($parent, $attributes, $table, $exists);
+        $instance = new static($attributes, $parent, $table, $exists);
 
         $instance->setRawAttributes($attributes, true);
 
@@ -106,29 +116,7 @@ class Pivot extends Model
     {
         $query->where($this->foreignKey, $this->getAttribute($this->foreignKey));
 
-        return $query->where($this->otherKey, $this->getAttribute($this->otherKey));
-    }
-
-    /**
-     * Eager load any defined relations.
-     *
-     * @return null
-     */
-    protected function eagerLoadRelations()
-    {
-        foreach ($this->with as $relation) {
-            $this->relations[$relation] = $this->$relation()->getResults();
-        }
-    }
-
-    /**
-     * Retrieve columns required by custom pivot model.
-     *
-     * @return array
-     */
-    public static function getPivotColumns()
-    {
-        return (new ReflectionClass(static::class))->getDefaultProperties()['include'];
+        return $query->where($this->relatedKey, $this->getAttribute($this->relatedKey));
     }
 
     /**
@@ -148,11 +136,10 @@ class Pivot extends Model
      */
     protected function getDeleteQuery()
     {
-        $foreign = $this->getAttribute($this->foreignKey);
-
-        $query = $this->newQuery()->where($this->foreignKey, $foreign);
-
-        return $query->where($this->otherKey, $this->getAttribute($this->otherKey));
+        return $this->newQuery()->where([
+            $this->foreignKey => $this->getAttribute($this->foreignKey),
+            $this->relatedKey => $this->getAttribute($this->relatedKey),
+        ]);
     }
 
     /**
@@ -170,23 +157,33 @@ class Pivot extends Model
      *
      * @return string
      */
+    public function getRelatedKey()
+    {
+        return $this->relatedKey;
+    }
+
+    /**
+     * Get the "related key" column name.
+     *
+     * @return string
+     */
     public function getOtherKey()
     {
-        return $this->otherKey;
+        return $this->getRelatedKey();
     }
 
     /**
      * Set the key names for the pivot model instance.
      *
      * @param  string  $foreignKey
-     * @param  string  $otherKey
+     * @param  string  $relatedKey
      * @return $this
      */
-    public function setPivotKeys($foreignKey, $otherKey)
+    public function setPivotKeys($foreignKey, $relatedKey)
     {
         $this->foreignKey = $foreignKey;
 
-        $this->otherKey = $otherKey;
+        $this->relatedKey = $relatedKey;
 
         return $this;
     }

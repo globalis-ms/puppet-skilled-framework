@@ -10,8 +10,8 @@ use JsonSerializable;
 use DateTimeInterface;
 use InvalidArgumentException;
 use RuntimeException;
-use \Globalis\PuppetSkilled\Event\Dispatcher;
-use \Globalis\PuppetSkilled\Core\Application;
+use Globalis\PuppetSkilled\Event\Dispatcher;
+use Globalis\PuppetSkilled\Core\Application;
 use Globalis\PuppetSkilled\Database\Magic\Relations\Pivot;
 use Globalis\PuppetSkilled\Database\Magic\Relations\HasOne;
 use Globalis\PuppetSkilled\Database\Magic\Relations\HasMany;
@@ -56,18 +56,32 @@ abstract class Model implements ArrayAccess, JsonSerializable
     protected $keyType = 'int';
 
     /**
-     * The number of models to return for pagination.
-     *
-     * @var int
-     */
-    protected $perPage = 15;
-
-    /**
      * Indicates if the IDs are auto-incrementing.
      *
      * @var bool
      */
     public $incrementing = true;
+
+    /**
+     * The relations to eager load on every query.
+     *
+     * @var array
+     */
+    protected $with = [];
+
+    /**
+     * The relationship counts that should be eager loaded on every query.
+     *
+     * @var array
+     */
+    protected $withCount = [];
+
+    /**
+     * The number of models to return for pagination.
+     *
+     * @var int
+     */
+    protected $perPage = 15;
 
     /**
      * Indicates if the model should be timestamped.
@@ -166,13 +180,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @var array
      */
     protected $observables = [];
-
-    /**
-     * The relations to eager load on every query.
-     *
-     * @var array
-     */
-    protected $with = [];
 
     /**
      * Indicates if the model exists.
@@ -328,7 +335,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Register a new global scope on the model.
      *
-     * @param  \Globalis\Database\Magic\Scope|\Closure|string  $scope
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Scope|\Closure|string  $scope
      * @param  \Closure|null  $implementation
      * @return mixed
      *
@@ -336,25 +343,20 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public static function addGlobalScope($scope, Closure $implementation = null)
     {
-        if (is_string($scope) && ! is_null($implementation)) {
+       if (is_string($scope) && ! is_null($implementation)) {
             return static::$globalScopes[static::class][$scope] = $implementation;
-        }
-
-        if ($scope instanceof Closure) {
+        } elseif ($scope instanceof Closure) {
             return static::$globalScopes[static::class][spl_object_hash($scope)] = $scope;
-        }
-
-        if ($scope instanceof Scope) {
+        } elseif ($scope instanceof Scope) {
             return static::$globalScopes[static::class][get_class($scope)] = $scope;
         }
-
         throw new InvalidArgumentException('Global scope must be an instance of Closure or Scope.');
     }
 
     /**
      * Determine if a model has a global scope.
      *
-     * @param  \Globalis\Database\Magic\Scope|string  $scope
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Scope|string  $scope
      * @return bool
      */
     public static function hasGlobalScope($scope)
@@ -365,8 +367,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Get a global scope registered with the model.
      *
-     * @param  \Globalis\Database\Magic\Scope|string  $scope
-     * @return \Globalis\Database\Magic\Scope|\Closure|null
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Scope|string  $scope
+     * @return \Globalis\PuppetSkilled\Database\Magic\Scope|\Closure|null
      */
     public static function getGlobalScope($scope)
     {
@@ -374,7 +376,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
             $scope = get_class($scope);
         }
 
-        return static::$globalScopes[static::class.'.'.$scope];
+        return array_get(static::$globalScopes, static::class.'.'.$scope);
     }
 
     /**
@@ -384,7 +386,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function getGlobalScopes()
     {
-        return (isset(static::$globalScopes[static::class]) ? static::$globalScopes[static::class] : []);
+        return array_get(static::$globalScopes, static::class, []);
     }
 
     /**
@@ -416,7 +418,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  array  $attributes
      * @return $this
      *
-     * @throws \Globalis\Database\Magic\MassAssignmentException
+     * @throws \RuntimeException
      */
     public function fill(array $attributes)
     {
@@ -462,7 +464,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
         if (count($this->getFillable()) > 0 && !static::$unguarded) {
             return array_intersect_key($attributes, array_flip($this->getFillable()));
         }
-
         return $attributes;
     }
 
@@ -481,6 +482,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
         $model = new static((array) $attributes);
 
         $model->exists = $exists;
+
+        $model->setConnection($this->getConnectionName());
 
         return $model;
     }
@@ -501,41 +504,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
         $model->setConnection($connection ?: $this->getConnectionName());
 
         return $model;
-    }
-
-    /**
-     * Create a collection of models from plain arrays.
-     *
-     * @param  array  $items
-     * @param  string|null  $connection
-     * @return array
-     */
-    public static function hydrate(array $items, $connection = null)
-    {
-        $instance = (new static)->setConnection($connection);
-
-        $items = array_map(function ($item) use ($instance) {
-            return $instance->newFromBuilder($item);
-        }, $items);
-
-        return $items;
-    }
-
-    /**
-     * Create a collection of models from a raw query.
-     *
-     * @param  string  $query
-     * @param  array  $bindings
-     * @param  string|null  $connection
-     * @return array
-     */
-    public static function hydrateRaw($query, $connection = null)
-    {
-        $instance = (new static)->setConnection($connection);
-
-        $items = $instance->getConnection()->query($query)->result();
-
-        return static::hydrate($items, $connection);
     }
 
     /**
@@ -569,7 +537,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Begin querying the model.
      *
-     * @return \Globalis\Database\Magic\Builder
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
      */
     public static function query()
     {
@@ -580,7 +548,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * Begin querying the model on a given connection.
      *
      * @param  string|null  $connection
-     * @return \Globalis\Database\Magic\Builder
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
      */
     public static function on($connection = null)
     {
@@ -602,11 +570,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public static function all($columns = ['*'])
     {
-        $columns = is_array($columns) ? $columns : func_get_args();
-
-        $instance = new static;
-
-        return $instance->newQuery()->get($columns);
+        return (new static)->newQuery()->get(
+            is_array($columns) ? $columns : func_get_args()
+        );
     }
 
     /**
@@ -617,17 +583,14 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function fresh($with = [])
     {
-        if (! $this->exists) {
+        if (!$this->exists) {
             return;
         }
 
-        if (is_string($with)) {
-            $with = func_get_args();
-        }
-
-        $key = $this->getKeyName();
-
-        return static::newQueryWithoutScopes()->with($with)->where($key, $this->getKey())->first();
+        return static::newQueryWithoutScopes()
+                        ->with(is_string($with) ? func_get_args() : $with)
+                        ->where($this->getKeyName(), $this->getKey())
+                        ->first();
     }
 
     /**
@@ -638,11 +601,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function load($relations)
     {
-        if (is_string($relations)) {
-            $relations = func_get_args();
-        }
-
-        $query = $this->newQuery()->with($relations);
+        $query = $this->newQuery()->with(
+            is_string($relations) ? func_get_args() : $relations
+        );
 
         $query->eagerLoadRelations([$this]);
 
@@ -653,17 +614,13 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * Begin querying a model with eager loading.
      *
      * @param  array|string  $relations
-     * @return \Globalis\Database\Magic\Builder|static
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder|static
      */
     public static function with($relations)
     {
-        if (is_string($relations)) {
-            $relations = func_get_args();
-        }
-
-        $instance = new static;
-
-        return $instance->newQuery()->with($relations);
+        return (new static)->newQuery()->with(
+            is_string($relations) ? func_get_args() : $relations
+        );
     }
 
     /**
@@ -674,14 +631,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function append($attributes)
     {
-        if (is_string($attributes)) {
-            $attributes = func_get_args();
-        }
-
         $this->appends = array_unique(
-            array_merge($this->appends, $attributes)
+            array_merge($this->appends, is_string($attributes) ? func_get_args() : $attributes)
         );
-
         return $this;
     }
 
@@ -691,16 +643,13 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  string  $related
      * @param  string  $foreignKey
      * @param  string  $localKey
-     * @return \Globalis\Database\Magic\Relations\HasOne
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\HasOne
      */
     public function hasOne($related, $foreignKey = null, $localKey = null)
     {
+        $instance = $this->newRelatedInstance($related);
         $foreignKey = $foreignKey ?: $this->getForeignKey();
-
-        $instance = new $related;
-
         $localKey = $localKey ?: $this->getKeyName();
-
         return new HasOne($instance->newQuery(), $this, $instance->getTable().'.'.$foreignKey, $localKey);
     }
 
@@ -712,11 +661,11 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  string  $type
      * @param  string  $id
      * @param  string  $localKey
-     * @return \Globalis\Database\Magic\Relations\MorphOne
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\MorphOne
      */
     public function morphOne($related, $name, $type = null, $id = null, $localKey = null)
     {
-        $instance = new $related;
+        $instance = $this->newRelatedInstance($related);
 
         list($type, $id) = $this->getMorphs($name, $type, $id);
 
@@ -732,38 +681,36 @@ abstract class Model implements ArrayAccess, JsonSerializable
      *
      * @param  string  $related
      * @param  string  $foreignKey
-     * @param  string  $otherKey
+     * @param  string  $ownerKey
      * @param  string  $relation
-     * @return \Globalis\Database\Magic\Relations\BelongsTo
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\BelongsTo
      */
-    public function belongsTo($related, $foreignKey = null, $otherKey = null, $relation = null)
+    public function belongsTo($related, $foreignKey = null, $ownerKey = null, $relation = null)
     {
         // If no relation name was given, we will use this debug backtrace to extract
         // the calling method's name and use that as the relationship name as most
         // of the time this will be what we desire to use for the relationships.
         if (is_null($relation)) {
-            list($current, $caller) = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-
-            $relation = $caller['function'];
+            $relation = $this->guessBelongsToRelation();
         }
+
+        $instance = $this->newRelatedInstance($related);
 
         // If no foreign key was supplied, we can use a backtrace to guess the proper
         // foreign key name by using the name of the relationship function, which
         // when combined with an "_id" should conventionally match the columns.
         if (is_null($foreignKey)) {
-            $foreignKey = str_snake($relation).'_id';
+            $foreignKey = str_snake($relation).'_'.$instance->getKeyName();
         }
-
-        $instance = new $related;
 
         // Once we have the foreign key names, we'll just create a new Eloquent query
         // for the related models and returns the relationship instance which will
         // actually be responsible for retrieving and hydrating every relations.
-        $query = $instance->newQuery();
+        $ownerKey = $ownerKey ?: $instance->getKeyName();
 
-        $otherKey = $otherKey ?: $instance->getKeyName();
-
-        return new BelongsTo($query, $this, $foreignKey, $otherKey, $relation);
+        return new BelongsTo(
+            $instance->newQuery(), $this, $foreignKey, $ownerKey, $relation
+        );
     }
 
     /**
@@ -772,61 +719,80 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  string  $name
      * @param  string  $type
      * @param  string  $id
-     * @return \Globalis\Database\Magic\Relations\MorphTo
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\MorphTo
      */
     public function morphTo($name = null, $type = null, $id = null)
     {
         // If no name is provided, we will use the backtrace to get the function name
         // since that is most likely the name of the polymorphic interface. We can
         // use that to get both the class and foreign key that will be utilized.
-        if (is_null($name)) {
-            list($current, $caller) = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-            $name = $caller['function'];
-        }
+        $name = $name ?: $this->guessBelongsToRelation();
 
         list($type, $id) = $this->getMorphs(str_snake($name), $type, $id);
 
         // If the type value is null it is probably safe to assume we're eager loading
         // the relationship. In this case we'll just pass in a dummy query where we
         // need to remove any eager loads that may already be defined on a model.
-        if (empty($class = $this->$type)) {
-            return new MorphTo(
-                $this->newQuery()->setEagerLoads([]),
-                $this,
-                $id,
-                null,
-                $type,
-                $name
-            );
-        } // If we are not eager loading the relationship we will essentially treat this
-        // as a belongs-to style relationship since morph-to extends that class and
-        // we will pass in the appropriate values so that it behaves as expected.
-        else {
-            $class = $this->getActualClassNameForMorph($class);
-
-            $instance = new $class;
-
-            return new MorphTo(
-                $instance->newQuery(),
-                $this,
-                $id,
-                $instance->getKeyName(),
-                $type,
-                $name
-            );
-        }
+        return empty($class = $this->{$type})
+                    ? $this->morphEagerTo($name, $type, $id)
+                    : $this->morphInstanceTo($class, $name, $type, $id);
     }
 
     /**
-     * Retrieve the fully qualified class name from a slug.
+     * Define a polymorphic, inverse one-to-one or many relationship.
+     *
+     * @param  string  $name
+     * @param  string  $type
+     * @param  string  $id
+     * @return \GLobalis\PuppetSkilled\Database\Magic\Relations\MorphTo
+     */
+    protected function morphEagerTo($name, $type, $id)
+    {
+        return new MorphTo(
+            $this->newQuery()->setEagerLoads([]), $this, $id, null, $type, $name
+        );
+    }
+
+    /**
+     * Define a polymorphic, inverse one-to-one or many relationship.
+     *
+     * @param  string  $target
+     * @param  string  $name
+     * @param  string  $type
+     * @param  string  $id
+     * @return \GLobalis\PuppetSkilled\Database\Magic\Relations\MorphTo
+     */
+    protected function morphInstanceTo($target, $name, $type, $id)
+    {
+        $instance = $this->newRelatedInstance(
+            static::getActualClassNameForMorph($target)
+        );
+
+        return new MorphTo(
+            $instance->newQuery(), $this, $id, $instance->getKeyName(), $type, $name
+        );
+    }
+
+    /**
+     * Retrieve the actual class name for a given morph class.
      *
      * @param  string  $class
      * @return string
      */
-    public function getActualClassNameForMorph($class)
+    public static function getActualClassNameForMorph($class)
     {
-        $map = Relation::morphMap();
-        return (isset($map[$class]) ? $map[$class] : $class);
+        return array_get(Relation::morphMap() ?: [], $class, $class);
+    }
+
+    /**
+     * Guess the "belongs to" relationship name.
+     *
+     * @return string
+     */
+    protected function guessBelongsToRelation()
+    {
+        list($one, $two, $caller) = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
+        return $caller['function'];
     }
 
     /**
@@ -835,17 +801,19 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  string  $related
      * @param  string  $foreignKey
      * @param  string  $localKey
-     * @return \Globalis\Database\Magic\Relations\HasMany
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\HasMany
      */
     public function hasMany($related, $foreignKey = null, $localKey = null)
     {
-        $foreignKey = $foreignKey ?: $this->getForeignKey();
+        $instance = $this->newRelatedInstance($related);
 
-        $instance = new $related;
+        $foreignKey = $foreignKey ?: $this->getForeignKey();
 
         $localKey = $localKey ?: $this->getKeyName();
 
-        return new HasMany($instance->newQuery(), $this, $instance->getTable().'.'.$foreignKey, $localKey);
+        return new HasMany(
+            $instance->newQuery(), $this, $instance->getTable().'.'.$foreignKey, $localKey
+        );
     }
 
     /**
@@ -856,7 +824,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  string|null  $firstKey
      * @param  string|null  $secondKey
      * @param  string|null  $localKey
-     * @return \Globalis\Database\Magic\Relations\HasManyThrough
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\HasManyThrough
      */
     public function hasManyThrough($related, $through, $firstKey = null, $secondKey = null, $localKey = null)
     {
@@ -868,7 +836,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
         $localKey = $localKey ?: $this->getKeyName();
 
-        return new HasManyThrough((new $related)->newQuery(), $this, $through, $firstKey, $secondKey, $localKey);
+        $instance = $this->newRelatedInstance($related);
+
+        return new HasManyThrough($instance->newQuery(), $this, $through, $firstKey, $secondKey, $localKey);
     }
 
     /**
@@ -879,11 +849,11 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  string  $type
      * @param  string  $id
      * @param  string  $localKey
-     * @return \Globalis\Database\Magic\Relations\MorphMany
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\MorphMany
      */
     public function morphMany($related, $name, $type = null, $id = null, $localKey = null)
     {
-        $instance = new $related;
+        $instance = $this->newRelatedInstance($related);
 
         // Here we will gather up the morph type and ID for the relationship so that we
         // can properly query the intermediate table of a relation. Finally, we will
@@ -903,27 +873,27 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  string  $related
      * @param  string  $table
      * @param  string  $foreignKey
-     * @param  string  $otherKey
+     * @param  string  $relatedKey
      * @param  string  $relation
-     * @return \Globalis\Database\Magic\Relations\BelongsToMany
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\BelongsToMany
      */
-    public function belongsToMany($related, $table = null, $foreignKey = null, $otherKey = null, $relation = null)
+    public function belongsToMany($related, $table = null, $foreignKey = null, $relatedKey = null, $relation = null)
     {
         // If no relationship name was passed, we will pull backtraces to get the
         // name of the calling function. We will use that function name as the
         // title of this relation since that is a great convention to apply.
         if (is_null($relation)) {
-            $relation = $this->getBelongsToManyCaller();
+            $relation = $this->guessBelongsToManyRelation();
         }
 
         // First, we'll need to determine the foreign key and "other key" for the
         // relationship. Once we have determined the keys we'll make the query
         // instances as well as the relationship instances we need for this.
+        $instance = $this->newRelatedInstance($related);
+
         $foreignKey = $foreignKey ?: $this->getForeignKey();
 
-        $instance = new $related;
-
-        $otherKey = $otherKey ?: $instance->getForeignKey();
+        $relatedKey = $relatedKey ?: $instance->getForeignKey();
 
         // If no table name was provided, we can guess it by concatenating the two
         // models using underscores in alphabetical order. The two model names
@@ -932,12 +902,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
             $table = $this->joiningTable($related);
         }
 
-        // Now we're ready to create a new query builder for the related model and
-        // the relationship instances for the relation. The relations will set
-        // appropriate query constraint and entirely manages the hydrations.
-        $query = $instance->newQuery();
-
-        return new BelongsToMany($query, $this, $table, $foreignKey, $otherKey, $relation);
+        return new BelongsToMany(
+            $instance->newQuery(), $this, $table, $foreignKey, $relatedKey, $relation
+        );
     }
 
     /**
@@ -947,39 +914,31 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  string  $name
      * @param  string  $table
      * @param  string  $foreignKey
-     * @param  string  $otherKey
+     * @param  string  $relatedKey
      * @param  bool  $inverse
-     * @return \Globalis\Database\Magic\Relations\MorphToMany
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\MorphToMany
      */
-    public function morphToMany($related, $name, $table, $foreignKey = null, $otherKey = null, $inverse = false)
+    public function morphToMany($related, $name, $table, $foreignKey = null, $relatedKey = null, $inverse = false)
     {
-        $caller = $this->getBelongsToManyCaller();
+        $caller = $this->guessBelongsToManyRelation();
 
         // First, we will need to determine the foreign key and "other key" for the
         // relationship. Once we have determined the keys we will make the query
         // instances, as well as the relationship instances we need for these.
+        $instance = $this->newRelatedInstance($related);
+
         $foreignKey = $foreignKey ?: $name.'_id';
 
-        $instance = new $related;
-
-        $otherKey = $otherKey ?: $instance->getForeignKey();
+        $relatedKey = $relatedKey ?: $instance->getForeignKey();
 
         // Now we're ready to create a new query builder for this related model and
         // the relationship instances for this relation. This relations will set
         // appropriate query constraints then entirely manages the hydrations.
-        $query = $instance->newQuery();
-
-        $table = $table;
+        $table = $table ?: Str::plural($name);
 
         return new MorphToMany(
-            $query,
-            $this,
-            $name,
-            $table,
-            $foreignKey,
-            $otherKey,
-            $caller,
-            $inverse
+            $instance->newQuery(), $this, $name, $table,
+            $foreignKey, $relatedKey, $caller, $inverse
         );
     }
 
@@ -990,19 +949,19 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * @param  string  $name
      * @param  string  $table
      * @param  string  $foreignKey
-     * @param  string  $otherKey
-     * @return \Globalis\Database\Magic\Relations\MorphToMany
+     * @param  string  $relatedKey
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\MorphToMany
      */
-    public function morphedByMany($related, $name, $table = null, $foreignKey = null, $otherKey = null)
+    public function morphedByMany($related, $name, $table = null, $foreignKey = null, $relatedKey = null)
     {
         $foreignKey = $foreignKey ?: $this->getForeignKey();
 
         // For the inverse of the polymorphic many-to-many relations, we will change
         // the way we determine the foreign and other keys, as it is the opposite
         // of the morph-to-many method since we're figuring out these inverses.
-        $otherKey = $otherKey ?: $name.'_id';
+        $relatedKey = $relatedKey ?: $name.'_id';
 
-        return $this->morphToMany($related, $name, $table, $foreignKey, $otherKey, true);
+        return $this->morphToMany($related, $name, $table, $foreignKey, $relatedKey, true);
     }
 
     /**
@@ -1010,19 +969,32 @@ abstract class Model implements ArrayAccess, JsonSerializable
      *
      * @return string
      */
-    protected function getBelongsToManyCaller()
+    protected function guessBelongsToManyRelation()
     {
-        $self = __FUNCTION__;
-
         $caller = null;
         foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) as $trace) {
-            if (!in_array($trace['function'], Model::$manyMethods) && $trace['function'] != $self) {
+            if (in_array($trace['function'], Model::$manyMethods)) {
                 $caller = $trace;
                 break;
             }
         }
 
         return ! is_null($caller) ? $caller['function'] : null;
+    }
+
+    /**
+     * Create a new model instance for a related model.
+     *
+     * @param  string  $class
+     * @return mixed
+     */
+    protected function newRelatedInstance($class)
+    {
+        $instance = new $class;
+        if (!$instance->getConnectionName()) {
+            $instance->setConnection($this->getConnectionName());
+        }
+        return $instance;
     }
 
     /**
@@ -1036,11 +1008,10 @@ abstract class Model implements ArrayAccess, JsonSerializable
         // The joining table name, by convention, is simply the snake cased models
         // sorted alphabetically and concatenated with an underscore, so we can
         // just sort the models and join them together to get the table name.
-        $base = str_snake(class_basename($this));
-
-        $related = str_snake(class_basename($related));
-
-        $models = [$related, $base];
+        $models = [
+            str_snake(class_basename($this)),
+            str_snake(class_basename($related))
+        ];
 
         // Now that we have the model names in an array we can just sort them and
         // use the implode function to join them together with an underscores,
@@ -1265,7 +1236,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
     {
         if (isset(static::$dispatcher)) {
             $name = static::class;
-
             static::$dispatcher->listen("puppet.{$event}: {$name}", $callback, $priority);
         }
     }
@@ -1296,7 +1266,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
     public function setObservableEvents(array $observables)
     {
         $this->observables = $observables;
-
         return $this;
     }
 
@@ -1308,9 +1277,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function addObservableEvents($observables)
     {
-        $observables = is_array($observables) ? $observables : func_get_args();
-
-        $this->observables = array_unique(array_merge($this->observables, $observables));
+        $this->observables = array_unique(array_merge(
+            $this->observables, is_array($observables) ? $observables : func_get_args()
+        ));
     }
 
     /**
@@ -1321,9 +1290,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function removeObservableEvents($observables)
     {
-        $observables = is_array($observables) ? $observables : func_get_args();
-
-        $this->observables = array_diff($this->observables, $observables);
+        $this->observables = array_diff(
+            $this->observables, is_array($observables) ? $observables : func_get_args()
+        );
     }
 
     /**
@@ -1369,9 +1338,11 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return $query->{$method}($column, $amount, $extra);
         }
 
-        $this->incrementOrDecrementAttributeValue($column, $amount, $method);
+        $this->incrementOrDecrementAttributeValue($column, $amount, $extra, $method);
 
-        return $query->where($this->getKeyName(), $this->getKey())->{$method}($column, $amount, $extra);
+        return $query->where(
+            $this->getKeyName(), $this->getKey()
+        )->{$method}($column, $amount, $extra);
     }
 
     /**
@@ -1379,12 +1350,15 @@ abstract class Model implements ArrayAccess, JsonSerializable
      *
      * @param  string  $column
      * @param  int  $amount
+     * @param  array  $extra
      * @param  string  $method
      * @return void
      */
-    protected function incrementOrDecrementAttributeValue($column, $amount, $method)
+    protected function incrementOrDecrementAttributeValue($column, $amount, $extra, $method)
     {
         $this->{$column} = $this->{$column} + ($method == 'increment' ? $amount : $amount * -1);
+
+        $this->forceFill($extra);
 
         $this->syncOriginalAttribute($column);
     }
@@ -1455,7 +1429,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
         if ($this->exists) {
             $saved = $this->isDirty() ?
                         $this->performUpdate($query) : true;
-        } // If the model is brand new, we'll insert it into our database and set the
+        }
+
+        // If the model is brand new, we'll insert it into our database and set the
         // ID attribute on the model to the value of the newly inserted row's ID
         // which is typically an auto-increment value managed by the database.
         else {
@@ -1485,7 +1461,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
-     * Finish processing on a successful save operation.
+     * Perform any actions that are necessary after the model is saved.
      *
      * @param  array  $options
      * @return void
@@ -1504,7 +1480,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Perform a model update operation.
      *
-     * @param  \Globalis\Database\Magic\Builder  $query
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
      * @return bool
      */
     protected function performUpdate(Builder $query)
@@ -1540,7 +1516,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Perform a model insert operation.
      *
-     * @param  \Globalis\Database\Magic\Builder  $query
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
      * @return bool
      */
     protected function performInsert(Builder $query)
@@ -1590,7 +1566,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Insert the given attributes and set the ID on the model.
      *
-     * @param  \Globalis\Database\Magic\Builder  $query
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
      * @param  array  $attributes
      * @return void
      */
@@ -1646,22 +1622,60 @@ abstract class Model implements ArrayAccess, JsonSerializable
         if (! isset(static::$dispatcher)) {
             return true;
         }
-
-        // We will append the names of the class to the event to distinguish it from
-        // other model events that are fired, allowing us to listen on each model
-        // event set individually instead of catching event for all the models.
-        $event = "puppet.{$event}: ".static::class;
-
+        // First, we will get the proper method to call on the event dispatcher, and then we
+        // will attempt to fire a custom, object based event for the given event. If that
+        // returns a result we can return that result, or we'll call the string events.
         $method = $halt ? 'until' : 'fire';
+        $result = $this->filterModelEventResults(
+            $this->fireCustomModelEvent($event, $method)
+        );
+        if ($result === false) {
+            return false;
+        }
+        return ! empty($result) ? $result : static::$dispatcher->{$method}(
+            "puppet.{$event}: ".static::class, $this
+        );
+    }
 
-        return static::$dispatcher->$method($event, $this);
+    /**
+     * Fire a custom model event for the given event.
+     *
+     * @param  string  $event
+     * @param  string  $method
+     * @return mixed|null
+     */
+    protected function fireCustomModelEvent($event, $method)
+    {
+        if (! isset($this->events[$event])) {
+            return;
+        }
+        $result = static::$dispatcher->$method(new $this->events[$event]($this));
+        if (! is_null($result)) {
+            return $result;
+        }
+    }
+
+    /**
+     * Filter the model event results.
+     *
+     * @param  mixed  $result
+     * @return mixed
+     */
+    protected function filterModelEventResults($result)
+    {
+        if (is_array($result)) {
+            $result = array_filter($result, function ($response) {
+                return ! is_null($response);
+            });
+        }
+        return $result;
     }
 
     /**
      * Set the keys for a save update query.
      *
-     * @param  \Globalis\Database\Magic\Builder  $query
-     * @return \Globalis\Database\Magic\Builder
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
      */
     protected function setKeysForSaveQuery(Builder $query)
     {
@@ -1677,11 +1691,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     protected function getKeyForSaveQuery()
     {
-        if (isset($this->original[$this->getKeyName()])) {
-            return $this->original[$this->getKeyName()];
-        }
-
-        return $this->getAttribute($this->getKeyName());
+        return isset($this->original[$this->getKeyName()])
+                        ? $this->original[$this->getKeyName()]
+                        : $this->getAttribute($this->getKeyName());
     }
 
     /**
@@ -1789,7 +1801,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Get a new query builder for the model's table.
      *
-     * @return \Globalis\Database\Magic\Builder
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
      */
     public function newQuery()
     {
@@ -1805,8 +1817,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Get a new query instance without a given scope.
      *
-     * @param  \Globalis\Database\Magic\Scope|string  $scope
-     * @return \Globalis\Database\Magic\Builder
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Scope|string  $scope
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder
      */
     public function newQueryWithoutScope($scope)
     {
@@ -1818,7 +1830,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Get a new query builder that doesn't have any global scopes.
      *
-     * @return \Globalis\Database\Magic\Builder|static
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder|static
      */
     public function newQueryWithoutScopes()
     {
@@ -1836,7 +1848,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * Create a new Eloquent query builder for the model.
      *
      * @param  \Globalis\PuppetSkilledDatabase\Query\Builder  $query
-     * @return \Globalis\Database\Magic\Builder|static
+     * @return \Globalis\PuppetSkilled\Database\Magic\Builder|static
      */
     public function newBuilder($query)
     {
@@ -1860,19 +1872,17 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Create a new pivot model instance.
      *
-     * @param  \Globalis\Database\Magic\Model  $parent
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $parent
      * @param  array  $attributes
      * @param  string  $table
      * @param  bool  $exists
-     * @return \Globalis\Database\Magic\Relations\Pivot
+     * @param  string|null  $using
+     * @return \Globalis\PuppetSkilled\Database\Magic\Relations\Pivot
      */
     public function newPivot(Model $parent, array $attributes, $table, $exists, $using = null)
-     {
-        if ($using) {
-            return new $using($parent, $attributes, $table, $exists);
-        }
-
-        return new Pivot($parent, $attributes, $table, $exists);
+    {
+        return $using ? $using::fromRawAttributes($parent, $attributes, $table, $exists)
+                      : new Pivot($attributes, $parent, $table, $exists);
     }
 
     /**
@@ -1956,6 +1966,19 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
+     * Set the data type for the primary key.
+     *
+     * @param  string  $type
+     * @return $this
+     */
+    public function setKeyType($type)
+    {
+        $this->keyType = $type;
+
+        return $this;
+    }
+
+    /**
      * Get the value of the model's route key.
      *
      * @return mixed
@@ -1994,11 +2017,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     protected function getMorphs($name, $type, $id)
     {
-        $type = $type ?: $name.'_type';
-
-        $id = $id ?: $name.'_id';
-
-        return [$type, $id];
+        return [$type ?: $name.'_type', $id ?: $name.'_id'];
     }
 
     /**
@@ -2049,7 +2068,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function getForeignKey()
     {
-        return str_snake(class_basename($this)).'_id';
+        return str_snake(class_basename($this)).'_'.$this->primaryKey;
     }
 
     /**
@@ -2083,9 +2102,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function addHidden($attributes = null)
     {
-        $attributes = is_array($attributes) ? $attributes : func_get_args();
-
-        $this->hidden = array_merge($this->hidden, $attributes);
+        $this->hidden = array_merge(
+            $this->hidden, is_array($attributes) ? $attributes : func_get_args()
+        );
     }
 
     /**
@@ -2404,9 +2423,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function toArray()
     {
-        $attributes = $this->attributesToArray();
-
-        return array_merge($attributes, $this->relationsToArray());
+        return array_merge($this->attributesToArray(), $this->relationsToArray());
     }
 
     /**
@@ -2416,11 +2433,103 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function attributesToArray()
     {
-        $attributes = $this->getArrayableAttributes();
-
         // If an attribute is a date, we will cast it to a string after converting it
         // to a DateTime / Carbon instance. This is so we will get some consistent
         // formatting while accessing attributes vs. arraying / JSONing a model.
+        $attributes = $this->addDateAttributesToArray(
+            $attributes = $this->getArrayableAttributes()
+        );
+
+        $attributes = $this->addMutatedAttributesToArray(
+            $attributes, $mutatedAttributes = $this->getMutatedAttributes()
+        );
+
+        // Next we will handle any casts that have been setup for this model and cast
+        // the values to their appropriate type. If the attribute has a mutator we
+        // will not perform the cast on those attributes to avoid any confusion.
+        $attributes = $this->addCastAttributesToArray(
+            $attributes, $mutatedAttributes
+        );
+
+        // Here we will grab all of the appended, calculated attributes to this model
+        // as these attributes are not really in the attributes array, but are run
+        // when we need to array or JSON the model for convenience to the coder.
+        foreach ($this->getArrayableAppends() as $key) {
+            $attributes[$key] = $this->mutateAttributeForArray($key, null);
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Add the casted attributes to the attributes array.
+     *
+     * @param  array  $attributes
+     * @param  array  $mutatedAttributes
+     * @return array
+     */
+    protected function addCastAttributesToArray(array $attributes, array $mutatedAttributes)
+    {
+        foreach ($this->getCasts() as $key => $value) {
+            if (! array_key_exists($key, $attributes) || in_array($key, $mutatedAttributes)) {
+                continue;
+            }
+
+            // Here we will cast the attribute. Then, if the cast is a date or datetime cast
+            // then we will serialize the date for the array. This will convert the dates
+            // to strings based on the date format specified for these Eloquent models.
+            $attributes[$key] = $this->castAttribute(
+                $key, $attributes[$key]
+            );
+
+            // If the attribute cast was a date or a datetime, we will serialize the date as
+            // a string. This allows the developers to customize hwo dates are serialized
+            // into an array without affecting how they are persisted into the storage.
+            if ($attributes[$key] &&
+                ($value === 'date' || $value === 'datetime')) {
+                $attributes[$key] = $this->serializeDate($attributes[$key]);
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Add the mutated attributes to the attributes array.
+     *
+     * @param  array  $attributes
+     * @param  array  $mutatedAttributes
+     * @return array
+     */
+    protected function addMutatedAttributesToArray(array $attributes, array $mutatedAttributes)
+    {
+        foreach ($mutatedAttributes as $key) {
+            // We want to spin through all the mutated attributes for this model and call
+            // the mutator for the attribute. We cache off every mutated attributes so
+            // we don't have to constantly check on attributes that actually change.
+            if (! array_key_exists($key, $attributes)) {
+                continue;
+            }
+
+            // Next, we will call the mutator for this attribute so that we can get these
+            // mutated attribute's actual values. After we finish mutating each of the
+            // attributes we will return this final array of the mutated attributes.
+            $attributes[$key] = $this->mutateAttributeForArray(
+                $key, $attributes[$key]
+            );
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * Add the date attributes to the attributes array.
+     *
+     * @param  array  $attributes
+     * @return array
+     */
+    protected function addDateAttributesToArray(array $attributes)
+    {
         foreach ($this->getDates() as $key) {
             if (! isset($attributes[$key])) {
                 continue;
@@ -2429,48 +2538,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
             $attributes[$key] = $this->serializeDate(
                 $this->asDateTime($attributes[$key])
             );
-        }
-
-        $mutatedAttributes = $this->getMutatedAttributes();
-
-        // We want to spin through all the mutated attributes for this model and call
-        // the mutator for the attribute. We cache off every mutated attributes so
-        // we don't have to constantly check on attributes that actually change.
-        foreach ($mutatedAttributes as $key) {
-            if (! array_key_exists($key, $attributes)) {
-                continue;
-            }
-
-            $attributes[$key] = $this->mutateAttributeForArray(
-                $key,
-                $attributes[$key]
-            );
-        }
-
-        // Next we will handle any casts that have been setup for this model and cast
-        // the values to their appropriate type. If the attribute has a mutator we
-        // will not perform the cast on those attributes to avoid any confusion.
-        foreach ($this->getCasts() as $key => $value) {
-            if (! array_key_exists($key, $attributes) ||
-                in_array($key, $mutatedAttributes)) {
-                continue;
-            }
-
-            $attributes[$key] = $this->castAttribute(
-                $key,
-                $attributes[$key]
-            );
-
-            if ($attributes[$key] && ($value === 'date' || $value === 'datetime')) {
-                $attributes[$key] = $this->serializeDate($attributes[$key]);
-            }
-        }
-
-        // Here we will grab all of the appended, calculated attributes to this model
-        // as these attributes are not really in the attributes array, but are run
-        // when we need to array or JSON the model for convenience to the coder.
-        foreach ($this->getArrayableAppends() as $key) {
-            $attributes[$key] = $this->mutateAttributeForArray($key, null);
         }
 
         return $attributes;
@@ -2581,7 +2648,11 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return;
         }
 
-        if (array_key_exists($key, $this->attributes) || $this->hasGetMutator($key)) {
+        // If the attribute exists in the attribute array or has a "get" mutator we will
+        // get the attribute's value. Otherwise, we will proceed as if the developers
+        // are asking for a relationship's value. This covers both types of values.
+        if (array_key_exists($key, $this->attributes) ||
+            $this->hasGetMutator($key)) {
             return $this->getAttributeValue($key);
         }
 
@@ -2676,13 +2747,13 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
         if (! $relations instanceof Relation) {
             throw new LogicException('Relationship method must return an object of type '
-                .'Globalis\Database\Magic\Relations\Relation');
+                .'Globalis\PuppetSkilled\Database\Magic\Relations\Relation');
         }
 
-        $this->setRelation($method, $results = $relations->getResults());
-
-        return $results;
+         $this->setRelation($method, $result = $relations->getResults());
+         return $result;
     }
+
 
     /**
      * Determine if a get mutator exists for an attribute.
@@ -2746,7 +2817,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     {
         if ($this->getIncrementing()) {
             return array_merge([
-                $this->getKeyName() => $this->keyType,
+                $this->getKeyName() => $this->getKeyType(),
             ], $this->casts);
         }
 
@@ -2787,6 +2858,18 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
+     * Determine if the given attribute is a date or date castable.
+     *
+     * @param  string  $key
+     * @return bool
+     */
+    protected function isDateAttribute($key)
+    {
+        return in_array($key, $this->getDates()) ||
+                                    $this->isDateCastable($key);
+    }
+
+    /**
      * Cast an attribute to a native PHP type.
      *
      * @param  string  $key
@@ -2819,6 +2902,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
             case 'collection':
                 return $this->fromJson($value);
             case 'date':
+                return $this->asDate($value);
             case 'datetime':
                 return $this->asDateTime($value);
             case 'timestamp':
@@ -2844,7 +2928,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
             $method = 'set'.str_studly($key).'Attribute';
 
             return $this->{$method}($value);
-        } // If an attribute is listed as a "date", we'll convert it from a DateTime
+        }
+        // If an attribute is listed as a "date", we'll convert it from a DateTime
         // instance into a form proper for storage on the database tables using
         // the connection grammar's date format. We will auto set the values.
         elseif ($value && (in_array($key, $this->getDates()) || $this->isDateCastable($key))) {
@@ -2852,7 +2937,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         if ($this->isJsonCastable($key) && ! is_null($value)) {
-            $value = $this->asJson($value);
+            $value = $this->castAttributeAsJson($value);
         }
 
         // If this attribute contains a JSON ->, we'll set the proper value in the
@@ -2878,13 +2963,38 @@ abstract class Model implements ArrayAccess, JsonSerializable
     {
         list($key, $path) = explode('->', $key, 2);
 
-        $arrayValue = isset($this->attributes[$key]) ? $this->fromJson($this->attributes[$key]) : [];
-
-        array_set($arrayValue, str_replace('->', '.', $path), $value);
-
-        $this->attributes[$key] = $this->asJson($arrayValue);
+        $this->attributes[$key] = $this->asJson($this->getArrayAttributeWithValue(
+            $path, $key, $value
+        ));
 
         return $this;
+    }
+
+    /**
+     * Get an array attribute or return an empty array if it is not set.
+     *
+     * @param  string  $key
+     * @return array
+     */
+    protected function getArrayAttributeByKey($key)
+    {
+        return isset($this->attributes[$key]) ?
+                    $this->fromJson($this->attributes[$key]) : [];
+    }
+
+    /**
+     * Get an array attribute with the given key and value set.
+     *
+     * @param  string  $path
+     * @param  string  $key
+     * @param  mixed  $value
+     * @return $this
+     */
+    protected function getArrayAttributeWithValue($path, $key, $value)
+    {
+        return tap($this->getArrayAttributeByKey($key), function (&$array) use ($path, $value) {
+            Arr::set($array, str_replace('->', '.', $path), $value);
+        });
     }
 
     /**
@@ -2907,7 +3017,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     {
         $defaults = [static::CREATED_AT, static::UPDATED_AT];
 
-        return $this->timestamps ? array_merge($this->dates, $defaults) : $this->dates;
+        return $this->usesTimestamps() ? array_merge($this->dates, $defaults) : $this->dates;
     }
 
     /**
@@ -2918,11 +3028,38 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function fromDateTime($value)
     {
-        $format = $this->getDateFormat();
+        return $this->asDateTime($value)->format(
+            $this->getDateFormat()
+        );
+    }
 
-        $value = $this->asDateTime($value);
+    /**
+     * Return a timestamp as DateTime object with time set to 00:00:00.
+     *
+     * @param  mixed  $value
+     * @return \Carbon\Carbon
+     */
+    protected function asDate($value)
+    {
+        return $this->asDateTime($value)->startOfDay();
+    }
 
-        return $value->format($format);
+    /**
+     * Cast the given attribute to JSON.
+     *
+     * @param  string  $key
+     * @param  mixed  $value
+     * @return string
+     */
+    protected function castAttributeAsJson($key, $value)
+    {
+        $value = $this->asJson($value);
+
+        if ($value === false) {
+            throw new RuntimeException('Error encoding model ['.get_class($this).'] with ID ['.$key.'] to JSON: '.json_last_error_msg());
+        }
+
+        return $value;
     }
 
     /**
@@ -2951,7 +3088,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
             // and format a Carbon object from this timestamp. This allows flexibility
             // when defining your date fields as they might be UNIX timestamps here.
             $return = Carbon::createFromTimestamp($value);
-        } elseif (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $value)) {
+        } elseif ($this->isStandardDateFormat($value)) {
             // If the value is in simply year, month, day format, we will instantiate the
             // Carbon instances from that format. Again, this provides for simple date
             // fields on the database, while still supporting Carbonized conversion.
@@ -2972,6 +3109,17 @@ abstract class Model implements ArrayAccess, JsonSerializable
             $return->setTimezone(\date_default_timezone_get());
         }
         return $return;
+    }
+
+    /**
+     * Determine if the given value is a standard date format.
+     *
+     * @param  string  $value
+     * @return bool
+     */
+    protected function isStandardDateFormat($value)
+    {
+        return preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $value);
     }
 
     /**
@@ -3046,7 +3194,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * Clone the model into a new, non-existing instance.
      *
      * @param  array|null  $except
-     * @return \Globalis\Database\Magic\Model
+     * @return \Globalis\PuppetSkilled\Database\Magic\Model
      */
     public function replicate(array $except = null)
     {
@@ -3072,7 +3220,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Determine if two models have the same ID and belong to the same table.
      *
-     * @param  \Globalis\Database\Magic\Model  $model
+     * @param  \Globalis\PuppetSkilled\Database\Magic\Model  $model
      * @return bool
      */
     public function is(Model $model)
@@ -3161,9 +3309,8 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return count($dirty) > 0;
         }
 
-        if (! is_array($attributes)) {
-            $attributes = func_get_args();
-        }
+        $attributes = is_array($attributes)
+                            ? $attributes : func_get_args();
 
         foreach ($attributes as $attribute) {
             if (array_key_exists($attribute, $dirty)) {
@@ -3345,6 +3492,16 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
+     * Unset the connection resolver for models.
+     *
+     * @return void
+     */
+    public static function unsetConnectionResolver()
+    {
+        static::$resolver = null;
+    }
+
+    /**
      * Get the event dispatcher instance.
      *
      * @return \Globalis\PuppetSkilled\Events\Dispatcher
@@ -3404,17 +3561,28 @@ abstract class Model implements ArrayAccess, JsonSerializable
         // Here we will extract all of the mutated attributes so that we can quickly
         // spin through them after we export models to their array form, which we
         // need to be fast. This'll let us know the attributes that can mutate.
-        if (preg_match_all('/(?<=^|;)get([^;]+?)Attribute(;|$)/', implode(';', get_class_methods($class)), $matches)) {
-            foreach ($matches[1] as $match) {
-                if (static::$snakeAttributes) {
-                    $match = str_snake($match);
-                }
-
-                $mutatedAttributes[] = lcfirst($match);
+        foreach (static::getMutatorMethods($class) as $match) {
+            if (static::$snakeAttributes) {
+                $match = str_snake($match);
             }
+
+            $mutatedAttributes[] = lcfirst($match);
         }
 
         static::$mutatorCache[$class] = $mutatedAttributes;
+    }
+
+    /**
+     * Get all of the attribute mutator methods.
+     *
+     * @param  mixed  $class
+     * @return array
+     */
+    protected static function getMutatorMethods($class)
+    {
+        preg_match_all('/(?<=^|;)get([^;]+?)Attribute(;|$)/', implode(';', get_class_methods($class)), $matches);
+
+        return $matches[1];
     }
 
     /**
