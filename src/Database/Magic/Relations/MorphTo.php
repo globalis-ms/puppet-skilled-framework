@@ -119,12 +119,6 @@ class MorphTo extends BelongsTo
                             ->mergeConstraintsFrom($this->getQuery())
                             ->with($this->getQuery()->getEagerLoads());
 
-        $key = $instance->getTable().'.'.$instance->getKeyName();
-
-        $query = $this->replayMacros($instance->newQuery())
-            ->mergeModelDefinedRelationConstraints($this->getQuery())
-            ->with($this->getQuery()->getEagerLoads());
-
         return $query->whereIn(
             $instance->getTable().'.'.$instance->getKeyName(), $this->gatherKeysByType($type)
         )->get();
@@ -139,13 +133,13 @@ class MorphTo extends BelongsTo
     protected function gatherKeysByType($type)
     {
         $foreign = $this->foreignKey;
-
         return array_unique(
             array_map(
-                $this->dictionary[$type],
                 function ($models) use ($foreign) {
-                    return head($models)->{$foreign};
-                }
+                    $tmp = reset($models);
+                    return $tmp->{$foreign};
+                },
+                $this->dictionary[$type]
             )
         );
     }
