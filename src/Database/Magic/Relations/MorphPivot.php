@@ -24,6 +24,21 @@ class MorphPivot extends Pivot
     protected $morphClass;
 
     /**
+     * Create a new model instance that is existing.
+     *
+     * @param  array  $attributes
+     * @param  string|null  $connection
+     * @return static
+     */
+    public function newFromBuilder($attributes = [], $connection = null)
+    {
+        $model = parent::newFromBuilder($attributes, $connection);
+        $model->setMorphType($this->morphType);
+        $model->setMorphClass($this->morphClass);
+        return $model;
+    }
+
+    /**
      * Set the keys for a save update query.
      *
      * @param  \Globalis\PuppetSkilled\Database\Magic\Builder  $query
