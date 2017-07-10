@@ -100,7 +100,7 @@ if (!function_exists('array_flatten')) {
 }
 
 if (!function_exists('array_set')) {
-    function array_set(&$array, $key, $value)
+    function array_set($array, $key, $value)
     {
         if (is_null($key)) {
             return $array = $value;
