@@ -45,7 +45,20 @@ class Node
         $resources = $this->resource($resourceType);
         if (!$acl->isEmpty()) {
             $child = $acl->dequeue();
-            if (isset($this->children[$child])) {
+            if ($child == '*') {
+                $acl->enqueue($child);
+                foreach ($this->children as $child) {
+                    if ($childResources = $child->getResourcesType(clone $acl, $resourceType)) {
+                        // Merge with ours resources
+                        if ($resources !== null) {
+                            $resources = clone $resources;
+                            $resources->union($childResources);
+                        } else {
+                            $resources = $childResources;
+                        }
+                    }
+                }
+            } elseif (isset($this->children[$child])) {
                 if ($childResources = $this->children[$child]->getResourcesType($acl, $resourceType)) {
                     // Merge with ours resources
                     if ($resources !== null) {
