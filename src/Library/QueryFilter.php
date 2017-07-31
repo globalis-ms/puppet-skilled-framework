@@ -58,7 +58,7 @@ class QueryFilter
     /**
      * Merge options with default options
      *
-     * @param  array  $options
+     * @param  array $options
      * @return array
      */
     protected function mergeOptions(array $options)
@@ -73,9 +73,12 @@ class QueryFilter
                     case 'get':
                         if (isset($_GET[$params])) {
                             if (is_array($_GET[$params])) {
-                                $_GET[$params] = array_filter($_GET[$params], function ($value) {
-                                    return (trim($value) !== '');
-                                });
+                                $_GET[$params] = array_filter(
+                                    $_GET[$params],
+                                    function ($value) {
+                                        return (trim($value) !== '');
+                                    }
+                                );
                                 if (empty($_GET[$params])) {
                                     unset($_GET[$params]);
                                 }
@@ -87,9 +90,12 @@ class QueryFilter
                     case 'post':
                         if (isset($_POST[$params]) && trim($_POST[$params]) === '') {
                             if (is_array($_POST[$params])) {
-                                $_POST[$params] = array_filter($_POST[$params], function ($value) {
-                                    return (trim($value) !== '');
-                                });
+                                $_POST[$params] = array_filter(
+                                    $_POST[$params],
+                                    function ($value) {
+                                        return (trim($value) !== '');
+                                    }
+                                );
                                 if (empty($_POST[$params])) {
                                     unset($_POST[$params]);
                                 }
@@ -191,11 +197,13 @@ class QueryFilter
     {
         $options = $this->options;
         if ($this->hasActiveFilters()) {
-            $query->where(function ($query) use ($options) {
-                foreach ($options['params'] as $param => $value) {
-                    $options['filters'][$param]($query, $value);
-                }
-            });
+            foreach ($options['params'] as $param => $value) {
+                $query->where(
+                    function ($query) use ($options, $param, $value) {
+                        $options['filters'][$param]($query, $value);
+                    }
+                );
+            }
         }
         //Setting data for filter form
         $this->options['params'] = $options['params'];
