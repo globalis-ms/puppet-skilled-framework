@@ -36,6 +36,20 @@ class Asset
     protected $htmlImagePath;
 
     /**
+     * Asset version
+     *
+     * @var string
+     */
+    protected $assetVersion;
+
+    /**
+     * Asset version insert function
+     *
+     * @var string
+     */
+    protected $assetInsertMethod;
+
+    /**
      * Loading styles files
      *
      * @var array
@@ -82,6 +96,8 @@ class Asset
         $this->htmlStylePath = isset($config['html_style_path']) ? trim($config['html_style_path'], '/') . '/' : 'public/css/';
         $this->htmlScriptPath = isset($config['html_script_path']) ? trim($config['html_script_path'], '/') . '/' : 'public/js/';
         $this->htmlImagePath = isset($config['html_image_path']) ? trim($config['html_image_path'], '/') . '/' : 'public/images/';
+        $this->assetVersion = isset($config['html_asset_version']) ? $config['html_asset_version'] : '';
+        $this->assetInsertMethod = isset($config['html_asset_version_insert_method']) ? $config['html_asset_version_insert_method'] : [$this, 'insertVersionInUrl'];
 
         if (isset($config['style_autoload'])) {
             foreach ($config['style_autoload'] as $style) {
@@ -97,6 +113,15 @@ class Asset
         self::$instance = $this;
     }
 
+    protected function insertVersionInUrl($url, $version)
+    {
+        if ($version) {
+            return $url . '?v=' .$version;
+        }
+
+        return $url;
+    }
+
     /**
      * Display links to loaded css files
      *
@@ -106,6 +131,9 @@ class Asset
     {
         foreach ($this->styles as $key => $options) {
             $href = (is_string($options['src'])) ? $options['src'] : $this->getStyleLink($key);
+            if ($options['with_version']) {
+                $href = call_user_func_array($this->assetInsertMethod, [$href, $this->assetVersion]);
+            }
             echo "<link rel='stylesheet'  href='" . $href . "' type='text/css' media='" . $options["media"] . "' />\n";
         }
     }
@@ -118,11 +146,12 @@ class Asset
      * @param  string  $media   Media link type default = all
      * @return void
      */
-    public function enqueueStyle($slug, $src = false, $media = 'all')
+    public function enqueueStyle($slug, $src = false, $media = 'all', $withVersion = true)
     {
         $this->styles[$slug] = [
             'src' => $src,
-            'media' => $media
+            'media' => $media,
+            'with_version' => $withVersion,
         ];
     }
 
@@ -165,6 +194,9 @@ class Asset
     {
         foreach ($this->scripts as $key => $options) {
             $src = (is_string($options['src'])) ? $options['src'] : $this->getScriptLink($key);
+            if ($options['with_version']) {
+                $src = call_user_func_array($this->assetInsertMethod, [$src, $this->assetVersion]);
+            }
             echo "<script type='text/javascript' src='$src'></script>\n";
         }
         $this->printInlineScript();
@@ -177,10 +209,11 @@ class Asset
      * @param  mixed   $src     Source file, if src = false src = slug
      * @return void
      */
-    public function enqueueScript($slug, $src = false)
+    public function enqueueScript($slug, $src = false, $withVersion = true)
     {
         $this->scripts[$slug] = [
             'src' => $src,
+            'with_version' => $withVersion,
         ];
     }
 
