@@ -31,14 +31,14 @@ class Service
      */
     public function dispatch(Queueable $job)
     {
-        if (isset($command->queue, $command->delay)) {
-            return $this->connection->laterOn($command->queue, $command->delay, $command);
+        if (isset($job->queue, $job->delay)) {
+            return $this->connection->laterOn($job->queue, $job->delay, $job);
         }
-        if (isset($command->queue)) {
-            return $this->connection->pushOn($command->queue, $command);
+        if (isset($job->queue)) {
+            return $this->connection->pushOn($job->queue, $job);
         }
-        if (isset($command->delay)) {
-            return $this->connection->later($command->delay, $command);
+        if (isset($job->delay)) {
+            return $this->connection->later($job->delay, $job);
         }
 
         return $this->connection->push($job);
