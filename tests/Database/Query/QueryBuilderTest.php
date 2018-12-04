@@ -5,7 +5,7 @@ use Mockery as m;
 use Globalis\PuppetSkilled\Database\Query\Builder;
 use Globalis\PuppetSkilled\Database\Query\Expression as Raw;
 
-class QueryBuilderTest extends \PHPUnit_Framework_TestCase
+class QueryBuilderTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {

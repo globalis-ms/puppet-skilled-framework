@@ -323,6 +323,20 @@ class Builder
     }
 
     /**
+     * Add a relationship count / exists condition to the query with where clauses and an "or".
+     *
+     * @param  string    $relation
+     * @param  \Closure  $callback
+     * @param  string    $operator
+     * @param  int       $count
+     * @return \Illuminate\Database\Eloquent\Builder|static
+     */
+    public function orWhereHas($relation, Closure $callback = null, $operator = '>=', $count = 1)
+    {
+        return $this->has($relation, $operator, $count, 'or', $callback);
+    }
+
+    /**
      * Add subselect queries to count the relations.
      *
      * @param  mixed  $relations
@@ -478,7 +492,7 @@ class Builder
             // no results we can just break and return from here. When there are results
             // we will call the callback with the current chunk of these results here.
             $results = $this->forPage($page, $count)->get();
-            $countResults = $results->count();
+            $countResults = $results ? count($results) : 0;
             if ($countResults == 0) {
                 break;
             }
@@ -910,7 +924,7 @@ class Builder
             // we will call the callback with the current chunk of these results here.
             $results = $clone->forPageAfterId($count, $lastId, $column)->get();
 
-            $countResults = $results->count();
+            $countResults = $results ? count($results) : 0;
 
             if ($countResults == 0) {
                 break;
@@ -923,7 +937,7 @@ class Builder
                 return false;
             }
 
-            $lastId = $results->last()->{$alias};
+            $lastId = end($results)->{$alias};
         } while ($countResults == $count);
 
         return true;
@@ -1172,12 +1186,14 @@ class Builder
         // We will keep track of how many wheres are on the query before running the
         // scope so that we can properly group the added scope constraints in the
         // query as their own isolated nested where statement and avoid issues.
-        $originalWhereCount = is_null($query->wheres)
-                    ? 0 : count($query->wheres);
+        $originalWhereCount = $query->wheres
+                    ? count($query->wheres) : 0;
 
         $result = $scope(...array_values($parameters)) ?: $this;
 
-        if (count($query->wheres) > $originalWhereCount) {
+        $distWhereCount = $query->wheres
+                    ? count($query->wheres) : 0;
+        if ($distWhereCount > $originalWhereCount) {
             $this->addNewWheresWithinGroup($query, $originalWhereCount);
         }
 

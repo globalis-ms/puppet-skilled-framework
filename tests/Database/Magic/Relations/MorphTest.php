@@ -7,7 +7,7 @@ use Globalis\PuppetSkilled\Database\Magic\Relations\MorphOne;
 use Globalis\PuppetSkilled\Database\Magic\Relations\Relation;
 use Globalis\PuppetSkilled\Database\Magic\Relations\MorphMany;
 
-class DatabaseMagicRelationsMorphTest extends \PHPUnit_Framework_TestCase
+class DatabaseMagicRelationsMorphTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {

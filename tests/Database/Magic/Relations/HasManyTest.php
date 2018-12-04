@@ -4,7 +4,7 @@ namespace Globalis\PuppetSkilled\Tests\Database\Magic\Relations;
 use Mockery as m;
 use Globalis\PuppetSkilled\Database\Magic\Relations\HasMany;
 
-class HasManyTest extends \PHPUnit_Framework_TestCase
+class HasManyTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {

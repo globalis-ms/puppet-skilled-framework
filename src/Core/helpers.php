@@ -106,6 +106,7 @@ if (!function_exists('array_set')) {
             return $array = $value;
         }
         $keys = explode('.', $key);
+        $baseArray = &$array;
         while (count($keys) > 1) {
             $key = array_shift($keys);
             // If the key doesn't exist at this depth, we will just create an empty array
@@ -117,7 +118,7 @@ if (!function_exists('array_set')) {
             $array = &$array[$key];
         }
         $array[array_shift($keys)] = $value;
-        return $array;
+        return $baseArray;
     }
 }
 

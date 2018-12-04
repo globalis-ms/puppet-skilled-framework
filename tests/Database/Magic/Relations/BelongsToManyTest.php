@@ -5,7 +5,7 @@ use Mockery as m;
 use Globalis\PuppetSkilled\Database\Magic\Relations\BelongsToMany;
 use ReflectionClass;
 
-class BelongsToManyTest extends \PHPUnit_Framework_TestCase
+class BelongsToManyTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {
@@ -698,10 +698,10 @@ class BelongsToManyTest extends \PHPUnit_Framework_TestCase
 
         $related->shouldReceive('getTable')->andReturn('roles');
         $related->shouldReceive('getKeyName')->andReturn('id');
-        $related->shouldReceive('newPivot')->andReturnUsing(function () {
+        $related->shouldReceive('newPivot')->andReturnUsing(function ($attributes) use ($related) {
             $reflector = new ReflectionClass('\Globalis\PuppetSkilled\Database\Magic\Relations\Pivot');
 
-            return $reflector->newInstanceArgs(func_get_args());
+            return $reflector->newInstanceArgs([$attributes, $related]);
         });
 
         $builder->shouldReceive('join')->once()->with('user_role', 'roles.id', '=', 'user_role.role_id');

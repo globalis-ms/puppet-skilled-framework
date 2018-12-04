@@ -4,7 +4,7 @@ namespace Globalis\PuppetSkilled\Tests\Database\Magic\Relations;
 use Mockery as m;
 use Globalis\PuppetSkilled\Database\Magic\Relations\MorphToMany;
 
-class MorphToManyTest extends \PHPUnit_Framework_TestCase
+class MorphToManyTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {
@@ -78,6 +78,7 @@ class MorphToManyTest extends \PHPUnit_Framework_TestCase
     public function getRelationArguments()
     {
         $parent = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model');
+        $parent->shouldReceive('getConnectionName')->andReturn('foo.connection');
         $parent->shouldReceive('getMorphClass')->andReturn(get_class($parent));
         $parent->shouldReceive('getKey')->andReturn(1);
         $parent->shouldReceive('getCreatedAtColumn')->andReturn('created_at');

@@ -4,7 +4,7 @@ namespace Globalis\PuppetSkilled\Tests\Database\Magic\Relations;
 use Mockery as m;
 use Globalis\PuppetSkilled\Database\Magic\Relations\Pivot;
 
-class PivotTest extends \PHPUnit_Framework_TestCase
+class PivotTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {
@@ -16,9 +16,9 @@ class PivotTest extends \PHPUnit_Framework_TestCase
         $parent = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model[getConnectionName]');
         $parent->shouldReceive('getConnectionName')->once()->andReturn('connection');
         $parent->setDateFormat('Y-m-d H:i:s');
-        $pivot = new Pivot($parent, ['foo' => 'bar', 'created_at' => '2015-09-12'], 'table', true);
+        $pivot = new Pivot(['foo' => 'bar', 'created_at' => '2015-09-12'],$parent, 'table', true);
 
-        $this->assertEquals(['foo' => 'bar', 'created_at' => '2015-09-12 00:00:00'], $pivot->getAttributes());
+        $this->assertEquals(['foo' => 'bar', 'created_at' => '2015-09-12 00:00:00.000000'], $pivot->getAttributes());
         $this->assertEquals('connection', $pivot->getConnectionName());
         $this->assertEquals('table', $pivot->getTable());
         $this->assertTrue($pivot->exists);
@@ -29,7 +29,7 @@ class PivotTest extends \PHPUnit_Framework_TestCase
         $parent = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model[getConnectionName]');
         $parent->shouldReceive('getConnectionName')->once()->andReturn('connection');
 
-        $pivot = new PivotTestMutatorStub($parent, ['foo' => 'bar'], 'table', true);
+        $pivot = new PivotTestMutatorStub(['foo' => 'bar'], $parent, 'table', true);
 
         $this->assertTrue($pivot->getMutatorCalled());
     }
@@ -48,7 +48,7 @@ class PivotTest extends \PHPUnit_Framework_TestCase
     {
         $parent = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model[getConnectionName]');
         $parent->shouldReceive('getConnectionName')->once()->andReturn('connection');
-        $pivot = new Pivot($parent, ['foo' => 'bar', 'shimy' => 'shake'], 'table', true);
+        $pivot = new Pivot(['foo' => 'bar', 'shimy' => 'shake'], $parent, 'table', true);
 
         $this->assertEquals([], $pivot->getDirty());
     }
@@ -57,7 +57,7 @@ class PivotTest extends \PHPUnit_Framework_TestCase
     {
         $parent = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model[getConnectionName]');
         $parent->shouldReceive('getConnectionName')->once()->andReturn('connection');
-        $pivot = new Pivot($parent, ['foo' => 'bar', 'shimy' => 'shake'], 'table', true);
+        $pivot = new Pivot(['foo' => 'bar', 'shimy' => 'shake'], $parent, 'table', true);
         $pivot->shimy = 'changed';
 
         $this->assertEquals(['shimy' => 'changed'], $pivot->getDirty());
@@ -68,10 +68,10 @@ class PivotTest extends \PHPUnit_Framework_TestCase
         $parent = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model[getConnectionName,getDates]');
         $parent->shouldReceive('getConnectionName')->andReturn('connection');
         $parent->shouldReceive('getDates')->andReturn([]);
-        $pivot = new PivotTestDateStub($parent, ['foo' => 'bar', 'created_at' => 'foo'], 'table');
+        $pivot = new PivotTestDateStub(['foo' => 'bar', 'created_at' => 'foo'], $parent, 'table');
         $this->assertTrue($pivot->timestamps);
 
-        $pivot = new PivotTestDateStub($parent, ['foo' => 'bar'], 'table');
+        $pivot = new PivotTestDateStub(['foo' => 'bar'], $parent, 'table');
         $this->assertFalse($pivot->timestamps);
     }
 
@@ -79,7 +79,7 @@ class PivotTest extends \PHPUnit_Framework_TestCase
     {
         $parent = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model[getConnectionName]');
         $parent->shouldReceive('getConnectionName')->once()->andReturn('connection');
-        $pivot = new Pivot($parent, ['foo' => 'bar'], 'table');
+        $pivot = new Pivot(['foo' => 'bar'], $parent, 'table');
         $pivot->setPivotKeys('foreign', 'other');
 
         $this->assertEquals('foreign', $pivot->getForeignKey());
@@ -91,13 +91,12 @@ class PivotTest extends \PHPUnit_Framework_TestCase
         $parent = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model[getConnectionName]');
         $parent->guard([]);
         $parent->shouldReceive('getConnectionName')->once()->andReturn('connection');
-        $pivot = $this->getMockBuilder('\Globalis\PuppetSkilled\Database\Magic\Relations\Pivot')->setMethods(['newQuery'])->setConstructorArgs([$parent, ['foo' => 'bar'], 'table'])->getMock();
+        $pivot = $this->getMockBuilder('\Globalis\PuppetSkilled\Database\Magic\Relations\Pivot')->setMethods(['newQuery'])->setConstructorArgs([['foo' => 'bar'], $parent, 'table'])->getMock();
         $pivot->setPivotKeys('foreign', 'other');
         $pivot->foreign = 'foreign.value';
         $pivot->other = 'other.value';
         $query = m::mock('stdClass');
-        $query->shouldReceive('where')->once()->with('foreign', 'foreign.value')->andReturn($query);
-        $query->shouldReceive('where')->once()->with('other', 'other.value')->andReturn($query);
+        $query->shouldReceive('where')->once()->with(['foreign' => 'foreign.value', 'other' => 'other.value'])->andReturn($query);
         $query->shouldReceive('delete')->once()->andReturn(true);
         $pivot->expects($this->once())->method('newQuery')->will($this->returnValue($query));
 
