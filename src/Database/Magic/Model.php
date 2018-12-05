@@ -2992,9 +2992,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     protected function getArrayAttributeWithValue($path, $key, $value)
     {
-        return tap($this->getArrayAttributeByKey($key), function (&$array) use ($path, $value) {
-            Arr::set($array, str_replace('->', '.', $path), $value);
-        });
+        return array_set($this->getArrayAttributeByKey($key), str_replace('->', '.', $path), $value);
     }
 
     /**
@@ -3047,16 +3045,15 @@ abstract class Model implements ArrayAccess, JsonSerializable
     /**
      * Cast the given attribute to JSON.
      *
-     * @param  string  $key
      * @param  mixed  $value
      * @return string
      */
-    protected function castAttributeAsJson($key, $value)
+    protected function castAttributeAsJson($value)
     {
         $value = $this->asJson($value);
 
         if ($value === false) {
-            throw new RuntimeException('Error encoding model ['.get_class($this).'] with ID ['.$key.'] to JSON: '.json_last_error_msg());
+            throw new RuntimeException('Error encoding model ['.get_class($this).'] to JSON: '.json_last_error_msg());
         }
 
         return $value;
@@ -3097,11 +3094,10 @@ abstract class Model implements ArrayAccess, JsonSerializable
             // Finally, we will just assume this date is in the format used by default on
             // the database connection and use that format to create the Carbon object
             // that is returned back out to the developers after we convert it here.
-            if (preg_match('/\.[0-9]+$/', $value)) {
-                $return = Carbon::createFromFormat($this->getDateFormat(), $value);
-            } else {
-                $return = Carbon::createFromFormat($this->getDateFormat(), $value.'.000');
+            if (preg_match('/\.u$/', $this->getDateFormat()) && !preg_match('/\.[0-9]+$/', $value)) {
+                $value = $value.'.000';
             }
+            $return = Carbon::createFromFormat($this->getDateFormat(), $value);
         }
 
         if (!$return->local) {

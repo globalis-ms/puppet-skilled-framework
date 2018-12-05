@@ -4,7 +4,7 @@ namespace Globalis\PuppetSkilled\Tests\Database\Magic\Relations;
 use Mockery as m;
 use Globalis\PuppetSkilled\Database\Magic\Relations\BelongsTo;
 
-class BelongsToTest extends \PHPUnit_Framework_TestCase
+class BelongsToTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {

@@ -3,7 +3,7 @@ namespace Globalis\PuppetSkilled\Tests\Database\Magic;
 
 use Mockery as m;
 
-class SoftDeletingScopeTest extends \PHPUnit_Framework_TestCase
+class SoftDeletingScopeTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {
@@ -21,24 +21,14 @@ class SoftDeletingScopeTest extends \PHPUnit_Framework_TestCase
         $scope->apply($builder, $model);
     }
 
-    public function testForceDeleteExtension()
+    public function testRestoreExtension()
     {
         $builder = m::mock('Globalis\PuppetSkilled\Database\Magic\Builder');
         $builder->shouldDeferMissing();
-        $scope = new \Globalis\PuppetSkilled\Database\Magic\SoftDeletingScope;
-        $scope->extend($builder);
-        $callback = $builder->getMacro('forceDelete');
-        $givenBuilder = m::mock('\Globalis\PuppetSkilled\Database\Magic\Builder');
-        $givenBuilder->shouldReceive('getQuery')->andReturn($query = m::mock('StdClass'));
-        $query->shouldReceive('delete')->once();
-
-        $callback($givenBuilder);
-    }
-
-    public function testRestoreExtension()
-    {
-        $builder = m::mock('\Globalis\PuppetSkilled\Database\Magic\Builder');
-        $builder->shouldDeferMissing();
+        $builder = new \Globalis\PuppetSkilled\Database\Magic\Builder(new \Globalis\PuppetSkilled\Database\Query\Builder(
+            m::mock('\CI_DB_Driver'),
+            m::mock('\Globalis\PuppetSkilled\Database\Query\Grammar')
+        ));
         $scope = new \Globalis\PuppetSkilled\Database\Magic\SoftDeletingScope;
         $scope->extend($builder);
         $callback = $builder->getMacro('restore');
@@ -55,6 +45,10 @@ class SoftDeletingScopeTest extends \PHPUnit_Framework_TestCase
     {
         $builder = m::mock('Globalis\PuppetSkilled\Database\Magic\Builder');
         $builder->shouldDeferMissing();
+        $builder = new \Globalis\PuppetSkilled\Database\Magic\Builder(new \Globalis\PuppetSkilled\Database\Query\Builder(
+            m::mock('\CI_DB_Driver'),
+            m::mock('\Globalis\PuppetSkilled\Database\Query\Grammar')
+        ));
         $scope = m::mock('Globalis\PuppetSkilled\Database\Magic\SoftDeletingScope[remove]');
         $scope->extend($builder);
         $callback = $builder->getMacro('withTrashed');
@@ -70,6 +64,10 @@ class SoftDeletingScopeTest extends \PHPUnit_Framework_TestCase
     {
         $builder = m::mock('Globalis\PuppetSkilled\Database\Magic\Builder');
         $builder->shouldDeferMissing();
+        $builder = new \Globalis\PuppetSkilled\Database\Magic\Builder(new \Globalis\PuppetSkilled\Database\Query\Builder(
+            m::mock('\CI_DB_Driver'),
+            m::mock('\Globalis\PuppetSkilled\Database\Query\Grammar')
+        ));
         $model = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model');
         $model->shouldDeferMissing();
         $scope = m::mock('Globalis\PuppetSkilled\Database\Magic\SoftDeletingScope[remove]');
@@ -90,6 +88,10 @@ class SoftDeletingScopeTest extends \PHPUnit_Framework_TestCase
     {
         $builder = m::mock('Globalis\PuppetSkilled\Database\Magic\Builder');
         $builder->shouldDeferMissing();
+        $builder = new \Globalis\PuppetSkilled\Database\Magic\Builder(new \Globalis\PuppetSkilled\Database\Query\Builder(
+            m::mock('\CI_DB_Driver'),
+            m::mock('\Globalis\PuppetSkilled\Database\Query\Grammar')
+        ));
         $model = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model');
         $model->shouldDeferMissing();
         $scope = m::mock('Globalis\PuppetSkilled\Database\Magic\SoftDeletingScope[remove]');

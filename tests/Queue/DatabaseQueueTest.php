@@ -5,7 +5,7 @@ use Mockery as m;
 use ReflectionClass;
 use stdClass;
 
-class DatabaseQueueTest extends \PHPUnit_Framework_TestCase
+class DatabaseQueueTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {

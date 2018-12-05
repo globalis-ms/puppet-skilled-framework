@@ -10,7 +10,7 @@ use Globalis\PuppetSkilled\Database\Magic\Relations\Relation;
 use Globalis\PuppetSkilled\Database\Query\Builder as QueryBuilder;
 use Carbon\Carbon;
 
-class RelationTest extends \PHPUnit_Framework_TestCase
+class RelationTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {
@@ -64,30 +64,6 @@ class RelationTest extends \PHPUnit_Framework_TestCase
         ], Relation::morphMap());
 
         Relation::morphMap([], false);
-    }
-
-    /**
-     * Testing to ensure loop does not occur during relational queries in global scopes.
-     *
-     * Executing parent model's global scopes could result in an infinite loop when the
-     * parent model's global scope utilizes a relation in a query like has or whereHas
-     */
-    public function testDonNotRunParentModelGlobalScopes()
-    {
-        /* @var Mockery\MockInterface $parent */
-        $eloquentBuilder = m::mock(Builder::class);
-        $queryBuilder = m::mock(QueryBuilder::class);
-        $parent = m::mock(ResetModelStub::class)->makePartial();
-        $grammar = m::mock(Grammar::class);
-
-        $eloquentBuilder->shouldReceive('getModel')->andReturn($related = m::mock(StdClass::class));
-        $eloquentBuilder->shouldReceive('getQuery')->andReturn($queryBuilder);
-        $queryBuilder->shouldReceive('getGrammar')->andReturn($grammar);
-        $grammar->shouldReceive('wrap');
-        $parent->shouldReceive('newQueryWithoutScopes')->andReturn($eloquentBuilder);
-
-        $relation = new RelationStub($eloquentBuilder, $parent);
-        $relation->wrap('test');
     }
 }
 

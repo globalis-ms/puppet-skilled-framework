@@ -4,7 +4,7 @@ namespace Globalis\PuppetSkilled\Tests\Database\Magic;
 use Mockery as m;
 use Carbon\Carbon;
 
-class SoftDeletingTraitTest extends \PHPUnit_Framework_TestCase
+class SoftDeletingTraitTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {

@@ -160,6 +160,8 @@ class HasManyThrough extends Relation
                 $model->setRelation(
                     $relation, $dictionary[$key]
                 );
+            } else {
+                $model->setRelation($relation, []);
             }
         }
 
@@ -227,7 +229,7 @@ class HasManyThrough extends Relation
     {
         $results = $this->take(1)->get($columns);
 
-        return count($results) > 0 ? $results->first() : null;
+        return count($results) > 0 ? array_shift($results) : null;
     }
 
     /**

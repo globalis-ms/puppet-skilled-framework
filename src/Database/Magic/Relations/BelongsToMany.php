@@ -203,6 +203,8 @@ class BelongsToMany extends Relation
                 $model->setRelation(
                     $relation, $dictionary[$key]
                 );
+            } else {
+                $model->setRelation($relation, []);
             }
         }
 

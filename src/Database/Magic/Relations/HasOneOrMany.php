@@ -95,7 +95,19 @@ abstract class HasOneOrMany extends Relation
      */
     public function matchOne(array $models, array $results, $relation)
     {
-        return $this->matchOneOrMany($models, $results, $relation, 'one');
+        $dictionary = $this->buildDictionary($results);
+
+        foreach ($models as $model) {
+            $key = $model->getAttribute($this->localKey);
+
+            if (isset($dictionary[$key])) {
+                $value = $this->getRelationValue($dictionary, $key, 'one');
+
+                $model->setRelation($relation, $value);
+            }
+        }
+
+        return $models;
     }
 
     /**
@@ -108,32 +120,17 @@ abstract class HasOneOrMany extends Relation
      */
     public function matchMany(array $models, array $results, $relation)
     {
-        return $this->matchOneOrMany($models, $results, $relation, 'many');
-    }
-
-    /**
-     * Match the eagerly loaded results to their many parents.
-     *
-     * @param  array   $models
-     * @param  array   $results
-     * @param  string  $relation
-     * @param  string  $type
-     * @return array
-     */
-    protected function matchOneOrMany(array $models, array $results, $relation, $type)
-    {
         $dictionary = $this->buildDictionary($results);
 
-        // Once we have the dictionary we can simply spin through the parent models to
-        // link them up with their children using the keyed dictionary to make the
-        // matching very convenient and easy work. Then we'll just return them.
         foreach ($models as $model) {
             $key = $model->getAttribute($this->localKey);
 
             if (isset($dictionary[$key])) {
-                $value = $this->getRelationValue($dictionary, $key, $type);
+                $value = $this->getRelationValue($dictionary, $key, 'many');
 
                 $model->setRelation($relation, $value);
+            } else {
+                $model->setRelation($relation, []);
             }
         }
 

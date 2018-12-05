@@ -54,7 +54,7 @@ class HasOne extends HasOneOrMany
         }
 
         $instance = $this->related->newInstance()->setAttribute(
-            $this->getPlainForeignKey(),
+            $this->getForeignKeyName(),
             $model->getAttribute($this->localKey)
         );
 

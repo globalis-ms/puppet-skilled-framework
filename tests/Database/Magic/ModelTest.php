@@ -11,7 +11,7 @@ use DateTimeInterface;
 use DateTimeImmutable;
 use ReflectionClass;
 
-class ModelTest extends \PHPUnit_Framework_TestCase
+class ModelTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {
@@ -102,14 +102,6 @@ class ModelTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($collection[1]->getAttributes(), $collection[1]->getOriginal());
         $this->assertEquals('Taylor', $collection[0]->name);
         $this->assertEquals('Otwell', $collection[1]->name);
-        $this->assertEquals('foo_connection', $collection[0]->getConnectionName());
-        $this->assertEquals('foo_connection', $collection[1]->getConnectionName());
-    }
-
-    public function testHydrateRawMakesRawQuery()
-    {
-        $collection = ModelHydrateRawStub::hydrateRaw('SELECT ?', ['foo']);
-        $this->assertEquals('hydrated', $collection);
     }
 
     public function testCreateMethodSavesNewModel()
@@ -348,29 +340,29 @@ class ModelTest extends \PHPUnit_Framework_TestCase
         $model = new ModelStub();
 
         $value =Carbon::parse('2015-04-17 22:59:01');
-        $this->assertEquals('2015-04-17 22:59:01', $model->fromDateTime($value));
+        $this->assertEquals('2015-04-17 22:59:01.000000', $model->fromDateTime($value));
 
         $value = new DateTime('2015-04-17 22:59:01');
         $this->assertInstanceOf(DateTime::class, $value);
         $this->assertInstanceOf(DateTimeInterface::class, $value);
-        $this->assertEquals('2015-04-17 22:59:01', $model->fromDateTime($value));
+        $this->assertEquals('2015-04-17 22:59:01.000000', $model->fromDateTime($value));
 
         $value = new DateTimeImmutable('2015-04-17 22:59:01');
         $this->assertInstanceOf(DateTimeImmutable::class, $value);
         $this->assertInstanceOf(DateTimeInterface::class, $value);
-        $this->assertEquals('2015-04-17 22:59:01', $model->fromDateTime($value));
+        $this->assertEquals('2015-04-17 22:59:01.000000', $model->fromDateTime($value));
 
         $value = '2015-04-17 22:59:01';
-        $this->assertEquals('2015-04-17 22:59:01', $model->fromDateTime($value));
+        $this->assertEquals('2015-04-17 22:59:01.000000', $model->fromDateTime($value));
 
         $value = '2015-04-17';
-        $this->assertEquals('2015-04-17 00:00:00', $model->fromDateTime($value));
+        $this->assertEquals('2015-04-17 00:00:00.000000', $model->fromDateTime($value));
 
         $value = '2015-4-17';
-        $this->assertEquals('2015-04-17 00:00:00', $model->fromDateTime($value));
+        $this->assertEquals('2015-04-17 00:00:00.000000', $model->fromDateTime($value));
 
         $value = '1429311541';
-        $this->assertEquals('2015-04-17 22:59:01', $model->fromDateTime($value));
+        $this->assertEquals('2015-04-17 22:59:01.000000', $model->fromDateTime($value));
     }
 
     public function testInsertProcess()
@@ -872,22 +864,13 @@ class ModelTest extends \PHPUnit_Framework_TestCase
     {
         $model = new ModelStub;
         $relation = $model->hasOne('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub');
-        $this->assertEquals('save_stub.model_stub_id', $relation->getForeignKey());
+        $this->assertEquals('save_stub.model_stub_id', $relation->getQualifiedForeignKeyName());
 
         $model = new ModelStub;
         $relation = $model->hasOne('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub', 'foo');
-        $this->assertEquals('save_stub.foo', $relation->getForeignKey());
+        $this->assertEquals('save_stub.foo', $relation->getQualifiedForeignKeyName());
         $this->assertSame($model, $relation->getParent());
         $this->assertInstanceOf('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub', $relation->getQuery()->getModel());
-    }
-
-    public function testMorphOneCreatesProperRelation()
-    {
-        $model = new ModelStub;
-        $relation = $model->morphOne('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub', 'morph');
-        $this->assertEquals('save_stub.morph_id', $relation->getForeignKey());
-        $this->assertEquals('save_stub.morph_type', $relation->getMorphType());
-        $this->assertEquals('Globalis\PuppetSkilled\Tests\Database\Magic\ModelStub', $relation->getMorphClass());
     }
 
     public function testCorrectMorphClassIsReturned()
@@ -906,11 +889,11 @@ class ModelTest extends \PHPUnit_Framework_TestCase
     {
         $model = new ModelStub;
         $relation = $model->hasMany('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub');
-        $this->assertEquals('save_stub.model_stub_id', $relation->getForeignKey());
+        $this->assertEquals('save_stub.model_stub_id', $relation->getQualifiedForeignKeyName());
 
         $model = new ModelStub;
         $relation = $model->hasMany('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub', 'foo');
-        $this->assertEquals('save_stub.foo', $relation->getForeignKey());
+        $this->assertEquals('save_stub.foo', $relation->getQualifiedForeignKeyName());
         $this->assertSame($model, $relation->getParent());
         $this->assertInstanceOf('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub', $relation->getQuery()->getModel());
     }
@@ -919,22 +902,9 @@ class ModelTest extends \PHPUnit_Framework_TestCase
     {
         $model = new ModelStub;
         $relation = $model->morphMany('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub', 'morph');
-        $this->assertEquals('save_stub.morph_id', $relation->getForeignKey());
-        $this->assertEquals('save_stub.morph_type', $relation->getMorphType());
+        $this->assertEquals('save_stub.morph_id', $relation->getQualifiedForeignKeyName());
+        $this->assertEquals('morph_type', $relation->getMorphType());
         $this->assertEquals('Globalis\PuppetSkilled\Tests\Database\Magic\ModelStub', $relation->getMorphClass());
-    }
-
-    public function testBelongsToCreatesProperRelation()
-    {
-        $model = new ModelStub;
-        $relation = $model->belongsToStub();
-        $this->assertEquals('belongs_to_stub_id', $relation->getForeignKey());
-        $this->assertSame($model, $relation->getParent());
-        $this->assertInstanceOf('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub', $relation->getQuery()->getModel());
-
-        $model = new ModelStub;
-        $relation = $model->belongsToExplicitKeyStub();
-        $this->assertEquals('foo', $relation->getForeignKey());
     }
 
     public function testMorphToCreatesProperRelation()
@@ -966,24 +936,6 @@ class ModelTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals('id', $relation4->getForeignKey());
         $this->assertEquals('type', $relation4->getMorphType());
         $this->assertEquals('someName', $relation4->getRelation());
-    }
-
-    public function testBelongsToManyCreatesProperRelation()
-    {
-        $model = new ModelStub;
-        $relation = $model->belongsToMany('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub');
-        $this->assertEquals('model_save_stub_model_stub.model_stub_id', $relation->getForeignKey());
-        $this->assertEquals('model_save_stub_model_stub.model_save_stub_id', $relation->getOtherKey());
-        $this->assertSame($model, $relation->getParent());
-        $this->assertInstanceOf('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub', $relation->getQuery()->getModel());
-        $this->assertEquals(__FUNCTION__, $relation->getRelationName());
-
-        $model = new ModelStub;
-        $relation = $model->belongsToMany('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub', 'table', 'foreign', 'other');
-        $this->assertEquals('table.foreign', $relation->getForeignKey());
-        $this->assertEquals('table.other', $relation->getOtherKey());
-        $this->assertSame($model, $relation->getParent());
-        $this->assertInstanceOf('\Globalis\PuppetSkilled\Tests\Database\Magic\ModelSaveStub', $relation->getQuery()->getModel());
     }
 
     public function testModelsAssumeTheirName()

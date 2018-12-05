@@ -5,7 +5,7 @@ use Mockery as m;
 use Globalis\PuppetSkilled\Database\Magic\SoftDeletes;
 use Globalis\PuppetSkilled\Database\Magic\Relations\HasManyThrough;
 
-class HasManyThroughTest extends \PHPUnit_Framework_TestCase
+class HasManyThroughTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {

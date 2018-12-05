@@ -4,7 +4,7 @@ namespace Globalis\PuppetSkilled\Tests\Database\Magic;
 use Mockery as m;
 use Globalis\PuppetSkilled\Database\Magic\Builder;
 
-class BuilderTest extends \PHPUnit_Framework_TestCase
+class BuilderTest extends \PHPUnit\Framework\TestCase
 {
     public function tearDown()
     {
@@ -154,6 +154,7 @@ class BuilderTest extends \PHPUnit_Framework_TestCase
     public function testChunkWithLastChunkComplete()
     {
         $builder = m::mock('Globalis\PuppetSkilled\Database\Magic\Builder[forPage,get]', [$this->getMockQueryBuilder()]);
+        $builder->getQuery()->orders[] = ['column' => 'foobar', 'direction' => 'asc'];
         $chunk1 = ['foo1', 'foo2'];
         $chunk2 = ['foo3', 'foo4'];
         $chunk3 = [];
@@ -161,6 +162,7 @@ class BuilderTest extends \PHPUnit_Framework_TestCase
         $builder->shouldReceive('forPage')->once()->with(2, 2)->andReturnSelf();
         $builder->shouldReceive('forPage')->once()->with(3, 2)->andReturnSelf();
         $builder->shouldReceive('get')->times(3)->andReturn($chunk1, $chunk2, $chunk3);
+        $builder->setModel($this->getMockModel());
 
         $callbackAssertor = m::mock('StdClass');
         $callbackAssertor->shouldReceive('doSomething')->once()->with($chunk1);
@@ -175,11 +177,13 @@ class BuilderTest extends \PHPUnit_Framework_TestCase
     public function testChunkWithLastChunkPartial()
     {
         $builder = m::mock('Globalis\PuppetSkilled\Database\Magic\Builder[forPage,get]', [$this->getMockQueryBuilder()]);
+        $builder->getQuery()->orders[] = ['column' => 'foobar', 'direction' => 'asc'];
         $chunk1 = ['foo1', 'foo2'];
         $chunk2 = ['foo3'];
         $builder->shouldReceive('forPage')->once()->with(1, 2)->andReturnSelf();
         $builder->shouldReceive('forPage')->once()->with(2, 2)->andReturnSelf();
         $builder->shouldReceive('get')->times(2)->andReturn($chunk1, $chunk2);
+        $builder->setModel($this->getMockModel());
 
         $callbackAssertor = m::mock('StdClass');
         $callbackAssertor->shouldReceive('doSomething')->once()->with($chunk1);
@@ -193,11 +197,13 @@ class BuilderTest extends \PHPUnit_Framework_TestCase
     public function testChunkCanBeStoppedByReturningFalse()
     {
         $builder = m::mock('Globalis\PuppetSkilled\Database\Magic\Builder[forPage,get]', [$this->getMockQueryBuilder()]);
+        $builder->getQuery()->orders[] = ['column' => 'foobar', 'direction' => 'asc'];
         $chunk1 = ['foo1', 'foo2'];
         $chunk2 = ['foo3'];
         $builder->shouldReceive('forPage')->once()->with(1, 2)->andReturnSelf();
         $builder->shouldReceive('forPage')->never()->with(2, 2);
         $builder->shouldReceive('get')->times(1)->andReturn($chunk1);
+        $builder->setModel($this->getMockModel());
 
         $callbackAssertor = m::mock('StdClass');
         $callbackAssertor->shouldReceive('doSomething')->once()->with($chunk1);
@@ -213,9 +219,11 @@ class BuilderTest extends \PHPUnit_Framework_TestCase
     public function testChunkWithCountZero()
     {
         $builder = m::mock('Globalis\PuppetSkilled\Database\Magic\Builder[forPage,get]', [$this->getMockQueryBuilder()]);
+        $builder->getQuery()->orders[] = ['column' => 'foobar', 'direction' => 'asc'];
         $chunk = [];
         $builder->shouldReceive('forPage')->once()->with(1, 0)->andReturnSelf();
         $builder->shouldReceive('get')->times(1)->andReturn($chunk);
+        $builder->setModel($this->getMockModel());
 
         $callbackAssertor = m::mock('StdClass');
         $callbackAssertor->shouldReceive('doSomething')->never();
@@ -343,8 +351,7 @@ class BuilderTest extends \PHPUnit_Framework_TestCase
         $model = m::mock('\Globalis\PuppetSkilled\Database\Magic\Model[getTable,getConnectionName,hydrate]');
         $model->shouldReceive('getTable')->once()->andReturn('foo_table');
         $builder->setModel($model);
-        $model->shouldReceive('getConnectionName')->once()->andReturn('foo_connection');
-        $model->shouldReceive('hydrate')->once()->with($records, 'foo_connection')->andReturn(['hydrated']);
+        $model->shouldReceive('hydrate')->once()->with($records)->andReturn(['hydrated']);
         $models = $builder->getModels(['foo']);
 
         $this->assertEquals($models, ['hydrated']);
@@ -352,13 +359,13 @@ class BuilderTest extends \PHPUnit_Framework_TestCase
 
     public function testEagerLoadRelationsLoadTopLevelRelationships()
     {
-        $builder = m::mock('Globalis\PuppetSkilled\Database\Magic\Builder[loadRelation]', [$this->getMockQueryBuilder()]);
+        $builder = m::mock('Globalis\PuppetSkilled\Database\Magic\Builder[eagerLoadRelation]', [$this->getMockQueryBuilder()]);
         $nop1 = function () {
         };
         $nop2 = function () {
         };
         $builder->setEagerLoads(['foo' => $nop1, 'foo.bar' => $nop2]);
-        $builder->shouldAllowMockingProtectedMethods()->shouldReceive('loadRelation')->with(['models'], 'foo', $nop1)->andReturn(['foo']);
+        $builder->shouldAllowMockingProtectedMethods()->shouldReceive('eagerLoadRelation')->with(['models'], 'foo', $nop1)->andReturn(['foo']);
 
         $results = $builder->eagerLoadRelations(['models']);
         $this->assertEquals(['foo'], $results);
@@ -736,7 +743,7 @@ class BuilderTest extends \PHPUnit_Framework_TestCase
 
         // alias has a dynamic hash, so replace with a static string for comparison
         $alias = 'self_alias_hash';
-        $aliasRegex = '/\b(laravel_reserved_\d)(\b|$)/i';
+        $aliasRegex = '/\b(puppet_reserved_\d)(\b|$)/i';
 
         $nestedSql = preg_replace($aliasRegex, $alias, $nestedSql);
         $dotSql = preg_replace($aliasRegex, $alias, $dotSql);
@@ -752,11 +759,11 @@ class BuilderTest extends \PHPUnit_Framework_TestCase
 
         // alias has a dynamic hash, so replace with a static string for comparison
         $alias = 'self_alias_hash';
-        $aliasRegex = '/\b(laravel_reserved_\d)(\b|$)/i';
+        $aliasRegex = '/\b(puppet_reserved_\d)(\b|$)/i';
 
         $sql = preg_replace($aliasRegex, $alias, $sql);
 
-        $this->assertContains('`self_related_stubs`.`parent_id` = `self_alias_hash`.`id`', $sql);
+        $this->assertContains('`self_alias_hash`.`id` = `self_related_stubs`.`parent_id`', $sql);
     }
 
     protected function mockConnectionForModel($model, $database)
