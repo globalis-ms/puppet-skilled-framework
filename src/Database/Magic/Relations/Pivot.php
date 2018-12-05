@@ -50,7 +50,7 @@ class Pivot extends Model
      * @param  bool    $exists
      * @return void
      */
-    public function __construct($attributes = [], Model $parent = null, $table = '', $exists = false)
+    public function __construct(array $attributes = [], Model $parent = null, $table = '', $exists = false)
     {
         parent::__construct();
 

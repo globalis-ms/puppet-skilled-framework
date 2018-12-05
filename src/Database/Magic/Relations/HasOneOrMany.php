@@ -101,7 +101,7 @@ abstract class HasOneOrMany extends Relation
             $key = $model->getAttribute($this->localKey);
 
             if (isset($dictionary[$key])) {
-                $value = $this->getRelationValue($dictionary, $key, $type);
+                $value = $this->getRelationValue($dictionary, $key, 'one');
 
                 $model->setRelation($relation, $value);
             }
@@ -126,7 +126,7 @@ abstract class HasOneOrMany extends Relation
             $key = $model->getAttribute($this->localKey);
 
             if (isset($dictionary[$key])) {
-                $value = $this->getRelationValue($dictionary, $key, $type);
+                $value = $this->getRelationValue($dictionary, $key, 'many');
 
                 $model->setRelation($relation, $value);
             } else {
