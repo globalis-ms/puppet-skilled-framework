@@ -6,7 +6,6 @@
     "require": {
         "php": ">=7.0",
         "pimple/pimple": "^3.0",
-        "league/commonmark": ">=0.15",
         "nesbot/carbon": ">=1.21 <2.0"
     },
     "require-dev": {
